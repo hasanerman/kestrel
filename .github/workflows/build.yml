@@ -1,0 +1,157 @@
+name: Build
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-22.04]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev patchelf
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+
+      - run: npm ci
+
+      - run: npm run build
+
+      - run: cargo test --manifest-path src-tauri/Cargo.toml
+
+  release:
+    needs: test
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    outputs:
+      id: ${{ steps.create.outputs.result }}
+      notes: ${{ steps.create.outputs.notes }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - id: create
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const { version } = require('./package.json')
+            const tag = `v${version}`
+            const { owner, repo } = context.repo
+            const log = require('fs').readFileSync('CHANGELOG.md', 'utf8')
+            const section = log.split(/^## /m).find((part) => part.split(String.fromCharCode(10))[0].trim() === version)
+            const body = section ? section.slice(section.indexOf(version) + version.length).trim() : `kestrel ${tag}`
+            core.setOutput('notes', body)
+            const releases = await github.paginate(github.rest.repos.listReleases, { owner, repo })
+            const existing = releases.find((r) => r.tag_name === tag)
+            if (existing) {
+              await github.rest.repos.updateRelease({ owner, repo, release_id: existing.id, draft: true, body })
+              return existing.id
+            }
+            const { data } = await github.rest.repos.createRelease({
+              owner,
+              repo,
+              tag_name: tag,
+              target_commitish: context.sha,
+              name: `kestrel ${tag}`,
+              body,
+              draft: true,
+            })
+            return data.id
+
+  bundle:
+    needs: release
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            args: --bundles nsis
+            artifact: kestrel-windows
+            path: src-tauri/target/release/bundle/nsis/*.exe
+          - os: macos-latest
+            args: --target universal-apple-darwin --bundles app,dmg
+            artifact: kestrel-macos
+            path: src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg
+          - os: ubuntu-22.04
+            args: --bundles deb,appimage
+            artifact: kestrel-linux
+            path: |
+              src-tauri/target/release/bundle/deb/*.deb
+              src-tauri/target/release/bundle/appimage/*.AppImage
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev patchelf
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.os == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+
+      - run: npm ci
+
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
+        with:
+          args: ${{ matrix.args }}
+          releaseId: ${{ needs.release.outputs.id }}
+          releaseBody: ${{ needs.release.outputs.notes }}
+
+      - uses: actions/upload-artifact@v5
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.path }}
+          if-no-files-found: error
+
+  publish:
+    needs: [release, bundle]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v8
+        with:
+          script: |
+            const { owner, repo } = context.repo
+            await github.rest.repos.updateRelease({
+              owner,
+              repo,
+              release_id: Number('${{ needs.release.outputs.id }}'),
+              draft: false,
+              make_latest: 'true',
+            })

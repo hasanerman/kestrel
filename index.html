@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>kestrel</title>
+    <script type="module" src="/src/main.ts"></script>
+  </head>
+  <body>
+    <div class="window">
+      <aside class="rail" data-tauri-drag-region>
+        <svg class="mark" viewBox="0 0 32 32" aria-hidden="true"><path d="M4 13 L16 19 L28 13" /><path d="M11 9 L16 12 L21 9" /><circle cx="16" cy="25" r="1.6" /></svg>
+        <button class="tab on" data-page="health" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h4l3 -7l4 14l3 -7h4" /></svg>
+        </button>
+        <button class="tab" data-page="apps" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4v16" /><path d="M3 8l4 -4l4 4" /><path d="M17 20v-16" /><path d="M13 16l4 4l4 -4" /></svg>
+        </button>
+        <button class="tab" data-page="sites" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M3.6 9h16.8M3.6 15h16.8" /><path d="M12 3a15 15 0 0 1 0 18a15 15 0 0 1 0 -18" /></svg>
+        </button>
+        <button class="tab bottom" data-page="settings" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8" /><circle cx="16" cy="7" r="2" /><circle cx="10" cy="17" r="2" /></svg>
+        </button>
+        <span class="live" id="live"></span>
+      </aside>
+
+      <main>
+        <header class="bar" data-tauri-drag-region>
+          <button class="win" id="btn-minimize" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12h12" /></svg></button>
+          <button class="win" id="btn-hide" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7L7 17" /></svg></button>
+        </header>
+
+        <section class="page on" id="page-health">
+          <div class="eyebrow"><i id="eyebrow-dot"></i><span id="condition"></span></div>
+          <div class="hero">
+            <div class="big num"><span id="ping">–</span><small>ms</small></div>
+            <div class="side num">
+              <div><b id="jitter">–</b><span id="lbl-jitter"></span></div>
+              <div><b id="loss">–</b><span id="lbl-loss"></span></div>
+            </div>
+          </div>
+          <canvas id="graph"></canvas>
+          <div class="rows" id="targets"></div>
+        </section>
+
+        <section class="page" id="page-apps">
+          <h1 id="lbl-apps"></h1>
+          <p class="later" id="lbl-apps-later"></p>
+        </section>
+
+        <section class="page" id="page-sites">
+          <h1 id="lbl-sites"></h1>
+          <p class="later" id="lbl-sites-later"></p>
+        </section>
+
+        <section class="page" id="page-settings">
+          <h1 id="lbl-settings"></h1>
+          <details class="acc">
+            <summary><span id="lbl-language"></span><span class="val" id="val-language"></span></summary>
+            <p class="hint" id="lbl-language-hint"></p>
+            <div class="options" id="opt-language"></div>
+          </details>
+          <details class="acc">
+            <summary><span id="lbl-theme"></span><span class="val" id="val-theme"></span></summary>
+            <p class="hint" id="lbl-theme-hint"></p>
+            <div class="options" id="opt-theme"></div>
+          </details>
+          <details class="acc">
+            <summary><span id="lbl-notifications"></span><span class="val" id="val-notifications"></span></summary>
+            <label class="toggle"><span id="lbl-notifications-toggle"></span><input class="switch" id="chk-notifications" type="checkbox" /></label>
+            <p class="hint" id="lbl-notifications-hint"></p>
+          </details>
+          <details class="acc">
+            <summary><span id="lbl-autostart"></span><span class="val" id="val-autostart"></span></summary>
+            <label class="toggle"><span id="lbl-autostart-toggle"></span><input class="switch" id="chk-autostart" type="checkbox" /></label>
+            <p class="hint" id="lbl-autostart-hint"></p>
+          </details>
+          <div class="settings-foot">
+            <span class="num" id="version"></span>
+            <button class="text-btn" id="btn-quit" type="button"></button>
+          </div>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>

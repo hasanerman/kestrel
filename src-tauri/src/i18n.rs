@@ -1,0 +1,68 @@
+use crate::health::Condition;
+
+pub struct Labels {
+    pub starting: &'static str,
+    pub ok: &'static str,
+    pub degraded: &'static str,
+    pub down: &'static str,
+    pub open: &'static str,
+    pub autostart: &'static str,
+    pub quit: &'static str,
+    pub lost: &'static str,
+    pub restored: &'static str,
+}
+
+const EN: Labels = Labels {
+    starting: "Measuring…",
+    ok: "Connection is stable",
+    degraded: "Connection is unstable",
+    down: "No internet",
+    open: "Open kestrel",
+    autostart: "Start with system",
+    quit: "Quit",
+    lost: "Internet connection dropped.",
+    restored: "Internet is back.",
+};
+
+const TR: Labels = Labels {
+    starting: "Ölçülüyor…",
+    ok: "Bağlantı stabil",
+    degraded: "Bağlantı dengesiz",
+    down: "İnternet yok",
+    open: "kestrel'i aç",
+    autostart: "Sistemle birlikte başlat",
+    quit: "Çıkış",
+    lost: "İnternet bağlantısı koptu.",
+    restored: "İnternet geri geldi.",
+};
+
+const RU: Labels = Labels {
+    starting: "Измерение…",
+    ok: "Соединение стабильно",
+    degraded: "Соединение нестабильно",
+    down: "Нет интернета",
+    open: "Открыть kestrel",
+    autostart: "Запускать вместе с системой",
+    quit: "Выход",
+    lost: "Интернет-соединение пропало.",
+    restored: "Интернет снова работает.",
+};
+
+pub fn labels(language: &str) -> &'static Labels {
+    match language {
+        "tr" => &TR,
+        "ru" => &RU,
+        _ => &EN,
+    }
+}
+
+impl Labels {
+    pub fn condition(&self, condition: Condition) -> &'static str {
+        match condition {
+            Condition::Starting => self.starting,
+            Condition::Ok => self.ok,
+            Condition::Degraded => self.degraded,
+            Condition::Down => self.down,
+        }
+    }
+}
