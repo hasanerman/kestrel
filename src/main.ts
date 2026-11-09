@@ -7,13 +7,18 @@ import "./styles.css";
 import { createBackend } from "./api";
 import { drawGraph } from "./graph";
 import { LANGUAGES, strings } from "./i18n";
-import type { Backend, Settings, Snapshot, TargetView, Theme } from "./types";
+import type { Backend, Minute, Outage, Range, Settings, Snapshot, TargetView, Theme } from "./types";
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 
 let backend: Backend;
 let settings: Settings;
 let latest: Snapshot | null = null;
+let range: Range = 5;
+let minutes: Minute[] = [];
+
+const RANGES: Range[] = [5, 60, 1440];
+const LIVE_SLOTS = 300;
 
 const THEMES: Theme[] = ["system", "light", "dark"];
 
@@ -27,7 +32,7 @@ function css(name: string) {
 
 function best(snapshot: Snapshot): TargetView | undefined {
   return snapshot.targets
-    .filter((t) => !t.failing && t.last !== null)
+    .filter((t) => t.kind === "internet" && !t.failing && t.last !== null)
     .sort((a, b) => (a.last ?? 0) - (b.last ?? 0))[0];
 }
 
@@ -56,21 +61,99 @@ function renderHealth() {
       row.className = "row";
       const name = document.createElement("span");
       name.className = "name";
-      name.textContent = target.name;
+      name.textContent = target.kind === "router" ? t.router : target.name;
       const host = document.createElement("em");
       host.textContent = target.host;
       name.append(host);
       const value = document.createElement("span");
-      value.className = `num ${pingClass(target.last)}`;
+      value.className = target.last !== null ? `num ${pingClass(target.last)}` : "bad";
       value.textContent = target.last !== null ? String(target.last) : t.noAnswer;
       row.append(name, value);
       return row;
     }),
   );
 
-  const graphed = snapshot.targets[0];
   const color = condition === "down" ? css("--red") : condition === "degraded" ? css("--amber") : css("--green");
-  if (graphed) drawGraph($<HTMLCanvasElement>("graph"), graphed.history, color);
+  const canvas = $<HTMLCanvasElement>("graph");
+  if (range === 5) {
+    const graphed = snapshot.targets.find((target) => target.kind === "internet");
+    if (graphed) drawGraph(canvas, graphed.history, color, LIVE_SLOTS);
+  } else {
+    drawGraph(canvas, minutes.map((m) => m.ping), color, range);
+  }
+  renderFoot(snapshot);
+}
+
+function clock(at: number) {
+  return new Date(at).toLocaleTimeString(settings.language, { hour: "2-digit", minute: "2-digit" });
+}
+
+function when(at: number) {
+  const t = strings(settings.language);
+  const day = new Date(at);
+  const today = new Date();
+  const yesterday = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1);
+  const sameDay = (a: Date, b: Date) => a.toDateString() === b.toDateString();
+  const prefix = sameDay(day, today)
+    ? t.today
+    : sameDay(day, yesterday)
+      ? t.yesterday
+      : day.toLocaleDateString(settings.language, { day: "numeric", month: "short" });
+  return `${prefix} ${clock(at)}`;
+}
+
+function duration(outage: Outage) {
+  const t = strings(settings.language);
+  const seconds = Math.max(1, Math.round(((outage.end ?? Date.now()) - outage.start) / 1000));
+  if (seconds < 60) return `${seconds} ${t.units.s}`;
+  if (seconds < 3600) return `${Math.round(seconds / 60)} ${t.units.min}`;
+  return `${Math.floor(seconds / 3600)} ${t.units.h} ${Math.round((seconds % 3600) / 60)} ${t.units.min}`;
+}
+
+function renderFoot(snapshot: Snapshot) {
+  const t = strings(settings.language);
+  const foot = $("foot");
+  const strong = (value: string) => {
+    const b = document.createElement("b");
+    b.textContent = value;
+    return b;
+  };
+  foot.classList.toggle("down", snapshot.outage !== null);
+  if (snapshot.outage) {
+    foot.replaceChildren(`${t.downSince} `, strong(clock(snapshot.outage.start)), ` · ${t.causes[snapshot.outage.cause]} · ${duration(snapshot.outage)}`);
+    return;
+  }
+  const last = snapshot.recent[0];
+  if (!last) {
+    foot.replaceChildren(t.noDrops);
+    return;
+  }
+  foot.replaceChildren(`${t.lastDrop} `, strong(when(last.start)), ` · ${t.causes[last.cause]} · ${duration(last)}`);
+}
+
+async function loadMinutes() {
+  if (range === 5) return;
+  minutes = await backend.history(range);
+  renderHealth();
+}
+
+function renderRange() {
+  const t = strings(settings.language);
+  $("range").replaceChildren(
+    ...RANGES.map((value) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = value === range ? "on" : "";
+      button.textContent = t.ranges[value];
+      button.onclick = () => {
+        range = value;
+        renderRange();
+        renderHealth();
+        void loadMinutes();
+      };
+      return button;
+    }),
+  );
 }
 
 function renderOptions<T extends string>(host: string, options: { id: T; name: string }[], current: string, pick: (id: T) => void) {
@@ -114,6 +197,7 @@ function renderSettings() {
   text("lbl-autostart-hint", t.autostartHint);
   text("val-autostart", settings.autostart ? t.on : t.off);
   text("btn-quit", t.quit);
+  renderRange();
   $<HTMLInputElement>("chk-notifications").checked = settings.notifications;
   $<HTMLInputElement>("chk-autostart").checked = settings.autostart;
 
@@ -172,6 +256,7 @@ async function start() {
   });
   window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", renderHealth);
   window.addEventListener("resize", renderHealth);
+  window.setInterval(() => void loadMinutes(), 30_000);
 
   renderSettings();
   renderHealth();

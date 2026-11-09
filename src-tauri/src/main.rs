@@ -41,6 +41,7 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             commands::init,
             commands::health,
+            commands::history,
             commands::set_language,
             commands::set_theme,
             commands::set_autostart,

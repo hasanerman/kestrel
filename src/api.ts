@@ -11,6 +11,7 @@ function tauriBackend(): Backend {
     setTheme: (theme) => invoke("set_theme", { theme }),
     setAutostart: (enabled) => invoke("set_autostart", { enabled }),
     setNotifications: (enabled) => invoke("set_notifications", { enabled }),
+    history: (minutes) => invoke("history", { minutes }),
     onHealth: (handler) => {
       void listen<Snapshot>("health", (event) => handler(event.payload));
     },

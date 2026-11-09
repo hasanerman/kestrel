@@ -1,6 +1,4 @@
-const VISIBLE = 120;
-
-export function drawGraph(canvas: HTMLCanvasElement, history: (number | null)[], color: string) {
+export function drawGraph(canvas: HTMLCanvasElement, history: (number | null)[], color: string, slots: number) {
   const rect = canvas.getBoundingClientRect();
   if (!rect.width) return;
   const ratio = window.devicePixelRatio || 1;
@@ -11,7 +9,7 @@ export function drawGraph(canvas: HTMLCanvasElement, history: (number | null)[],
   ctx.scale(ratio, ratio);
   ctx.clearRect(0, 0, rect.width, rect.height);
 
-  const points = history.slice(-VISIBLE);
+  const points = history.slice(-slots);
   const answered = points.filter((v): v is number => v !== null);
   if (answered.length < 2) return;
 
@@ -19,8 +17,8 @@ export function drawGraph(canvas: HTMLCanvasElement, history: (number | null)[],
   const high = Math.max(...answered) + 8;
   const width = rect.width;
   const height = rect.height;
-  const step = width / (VISIBLE - 1);
-  const offset = (VISIBLE - points.length) * step;
+  const step = width / Math.max(1, slots - 1);
+  const offset = (slots - points.length) * step;
   const y = (v: number) => height - 6 - ((v - low) / (high - low)) * (height - 12);
 
   const fill = ctx.createLinearGradient(0, 0, 0, height);

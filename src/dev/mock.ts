@@ -1,12 +1,15 @@
 import pkg from "../../package.json";
-import type { Backend, Condition, Settings, Snapshot, TargetView } from "../types";
+import type { Backend, Condition, Kind, Minute, Outage, Settings, Snapshot, TargetView } from "../types";
 
-const TARGETS = [
-  { id: "cloudflare", name: "Cloudflare", host: "1.1.1.1", base: 18 },
-  { id: "google", name: "Google", host: "8.8.8.8", base: 21 },
+const TARGETS: { id: string; name: string; host: string; kind: Kind; base: number }[] = [
+  { id: "router", name: "Router", host: "192.168.1.1", kind: "router", base: 2 },
+  { id: "cloudflare", name: "Cloudflare", host: "1.1.1.1", kind: "internet", base: 18 },
+  { id: "google", name: "Google", host: "8.8.8.8", kind: "internet", base: 21 },
 ];
 
-function summarize(id: string, name: string, host: string, history: (number | null)[]): TargetView {
+const HOUR = 3_600_000;
+
+function summarize(id: string, name: string, host: string, kind: Kind, history: (number | null)[]): TargetView {
   const recent = history.slice(-60);
   const answered = recent.filter((v): v is number => v !== null);
   const lost = recent.length - answered.length;
@@ -15,6 +18,7 @@ function summarize(id: string, name: string, host: string, history: (number | nu
     id,
     name,
     host,
+    kind,
     last: history.at(-1) ?? null,
     jitter: diffs.length ? Math.round(diffs.reduce((a, b) => a + b, 0) / diffs.length) : null,
     loss: recent.length ? (lost * 100) / recent.length : 0,
@@ -36,19 +40,37 @@ export function mockBackend(): Backend {
   };
   const histories = TARGETS.map(() => [] as (number | null)[]);
   const handlers: ((snapshot: Snapshot) => void)[] = [];
+  const started = Date.now() - 95_000;
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  yesterday.setHours(21, 14, 0, 0);
+  const recent: Outage[] =
+    params.get("drops") === "none"
+      ? []
+      : [
+          { start: yesterday.getTime(), end: yesterday.getTime() + 180_000, cause: "provider" },
+          { start: yesterday.getTime() - 26 * HOUR, end: yesterday.getTime() - 26 * HOUR + 40_000, cause: "local" },
+        ];
+  const minutesFor = (count: number): Minute[] =>
+    Array.from({ length: count }, (_, i) => {
+      const at = Date.now() - (count - i) * 60_000;
+      const dropped = count > 100 && i > count - 180 && i < count - 176;
+      return { at, ping: dropped ? null : Math.round(18 + Math.random() * 5 + (i % 240 < 20 ? 15 : 0)), loss: dropped ? 100 : 0 };
+    });
 
   const sample = (base: number, tick: number) => {
-    if (forced === "down") return null;
+    if (forced === "down") return base < 5 ? base : null;
     if (forced === "degraded") return Math.random() < 0.1 ? null : base + 120 + Math.round(Math.random() * 60);
     const spike = tick % 90 > 70 && tick % 90 < 75 ? 20 * Math.random() : 0;
     return Math.round(base + Math.random() * 4 + spike);
   };
 
   const snapshot = (): Snapshot => {
-    const targets = TARGETS.map((t, i) => summarize(t.id, t.name, t.host, histories[i]));
-    const best = targets.filter((t) => !t.failing).sort((a, b) => (a.last ?? 1e9) - (b.last ?? 1e9))[0];
+    const targets = TARGETS.map((t, i) => summarize(t.id, t.name, t.host, t.kind, histories[i]));
+    const best = targets.filter((t) => t.kind === "internet" && !t.failing).sort((a, b) => (a.last ?? 1e9) - (b.last ?? 1e9))[0];
     const condition: Condition = !best ? "down" : best.loss > 5 || (best.last ?? 1e9) > 150 ? "degraded" : "ok";
-    return { condition, targets };
+    const outage: Outage | null = condition === "down" ? { start: started, end: null, cause: "provider" } : null;
+    return { condition, method: "icmp", outage, recent, targets };
   };
 
   for (let tick = 0; tick < 120; tick += 1) {
@@ -82,6 +104,9 @@ export function mockBackend(): Backend {
     setTheme: (theme) => update({ theme }),
     setAutostart: (autostart) => update({ autostart }),
     setNotifications: (notifications) => update({ notifications }),
+    async history(minutes) {
+      return minutesFor(minutes);
+    },
     onHealth(handler) {
       handlers.push(handler);
     },

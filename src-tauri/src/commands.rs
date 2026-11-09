@@ -1,7 +1,8 @@
 use serde::Serialize;
 use tauri::{AppHandle, State};
 
-use crate::health::{Latest, Snapshot};
+use crate::health::history::Minute;
+use crate::health::{Archive, Latest, Snapshot};
 use crate::settings::{Settings, Store};
 use crate::{autostart, log, tray};
 
@@ -31,6 +32,11 @@ pub fn init(app: AppHandle, store: State<Store>, latest: State<Latest>, language
 #[tauri::command]
 pub fn health(latest: State<Latest>) -> Option<Snapshot> {
     latest.get()
+}
+
+#[tauri::command]
+pub fn history(archive: State<Archive>, minutes: u32) -> Vec<Minute> {
+    archive.minutes(minutes.min(60 * 24 * 31))
 }
 
 #[tauri::command]

@@ -1,11 +1,27 @@
 export type Condition = "starting" | "ok" | "degraded" | "down";
 export type Language = "en" | "tr" | "ru";
 export type Theme = "system" | "light" | "dark";
+export type Kind = "router" | "internet";
+export type Cause = "provider" | "local";
+export type Range = 5 | 60 | 1440;
+
+export interface Outage {
+  start: number;
+  end: number | null;
+  cause: Cause;
+}
+
+export interface Minute {
+  at: number;
+  ping: number | null;
+  loss: number;
+}
 
 export interface TargetView {
   id: string;
   name: string;
   host: string;
+  kind: Kind;
   last: number | null;
   jitter: number | null;
   loss: number;
@@ -15,6 +31,9 @@ export interface TargetView {
 
 export interface Snapshot {
   condition: Condition;
+  method: "icmp" | "tcp";
+  outage: Outage | null;
+  recent: Outage[];
   targets: TargetView[];
 }
 
@@ -40,6 +59,7 @@ export interface Backend {
   setTheme(theme: Theme): Promise<Settings>;
   setAutostart(enabled: boolean): Promise<Settings>;
   setNotifications(enabled: boolean): Promise<Settings>;
+  history(minutes: number): Promise<Minute[]>;
   onHealth(handler: (snapshot: Snapshot) => void): void;
   minimize(): Promise<void>;
   hide(): Promise<void>;

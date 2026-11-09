@@ -9,6 +9,7 @@ pub struct Labels {
     pub autostart: &'static str,
     pub quit: &'static str,
     pub lost: &'static str,
+    pub lost_local: &'static str,
     pub restored: &'static str,
 }
 
@@ -20,7 +21,8 @@ const EN: Labels = Labels {
     open: "Open kestrel",
     autostart: "Start with system",
     quit: "Quit",
-    lost: "Internet connection dropped.",
+    lost: "Internet connection dropped. Your router answers, so the problem is likely your provider.",
+    lost_local: "Your Wi-Fi or router is not responding.",
     restored: "Internet is back.",
 };
 
@@ -32,7 +34,8 @@ const TR: Labels = Labels {
     open: "kestrel'i aç",
     autostart: "Sistemle birlikte başlat",
     quit: "Çıkış",
-    lost: "İnternet bağlantısı koptu.",
+    lost: "İnternet koptu. Modem cevap veriyor, sorun büyük ihtimalle servis sağlayıcında.",
+    lost_local: "Wi-Fi ya da modem cevap vermiyor.",
     restored: "İnternet geri geldi.",
 };
 
@@ -44,7 +47,8 @@ const RU: Labels = Labels {
     open: "Открыть kestrel",
     autostart: "Запускать вместе с системой",
     quit: "Выход",
-    lost: "Интернет-соединение пропало.",
+    lost: "Интернет пропал. Роутер отвечает, скорее всего проблема у провайдера.",
+    lost_local: "Wi-Fi или роутер не отвечает.",
     restored: "Интернет снова работает.",
 };
 

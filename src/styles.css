@@ -284,7 +284,39 @@ main {
   width: 100%;
   height: 110px;
   display: block;
-  margin-bottom: 18px;
+  margin-bottom: 6px;
+}
+
+.range {
+  display: flex;
+  gap: 14px;
+  font-size: 11.5px;
+  color: var(--faint);
+  margin-bottom: 14px;
+}
+
+.range button {
+  all: unset;
+}
+
+.range button:hover,
+.range button.on {
+  color: var(--text);
+}
+
+.foot {
+  margin-top: auto;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.foot b {
+  font-weight: 500;
+  color: var(--soft);
+}
+
+.foot.down b {
+  color: var(--red);
 }
 
 .rows {
