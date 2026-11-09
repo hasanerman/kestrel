@@ -1,9 +1,11 @@
 use serde::Serialize;
-use tauri::{AppHandle, State};
+use tauri::{AppHandle, Manager, State};
 
 use crate::health::history::Minute;
-use crate::health::{Archive, Latest, Snapshot};
+use crate::health::{Archive, Condition, Latest, Snapshot};
 use crate::settings::{Settings, Store};
+use crate::sites::lists::{Category, CATEGORIES};
+use crate::sites::{self, SiteResult};
 use crate::{autostart, log, tray};
 
 #[derive(Serialize)]
@@ -62,6 +64,25 @@ pub fn set_autostart(app: AppHandle, store: State<Store>, enabled: bool) -> Resu
 #[tauri::command]
 pub fn set_notifications(store: State<Store>, enabled: bool) -> Settings {
     store.update(|s| s.notifications = enabled)
+}
+
+#[tauri::command]
+pub fn site_lists() -> Vec<Category> {
+    CATEGORIES.to_vec()
+}
+
+#[tauri::command]
+pub async fn check_sites(app: AppHandle, hosts: Vec<String>) -> Vec<SiteResult> {
+    let online = app
+        .try_state::<Latest>()
+        .and_then(|latest| latest.get())
+        .is_none_or(|snapshot| snapshot.condition != Condition::Down);
+    sites::check_all(&app, hosts, online).await
+}
+
+#[tauri::command]
+pub fn set_sites(store: State<Store>, sites: Vec<String>) -> Settings {
+    store.update(|s| s.set_sites(&sites))
 }
 
 #[tauri::command]

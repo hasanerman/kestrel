@@ -17,6 +17,25 @@ export interface Minute {
   loss: number;
 }
 
+export type Verdict = "works" | "dnsBlocked" | "dpiBlocked" | "certificate" | "unreachable" | "down" | "noInternet";
+export type Failure = "dns" | "blockPage" | "timeout" | "reset" | "refused" | "closed" | "certificate" | "server" | "other";
+
+export interface Category {
+  id: string;
+  hosts: string[];
+}
+
+export interface SiteResult {
+  host: string;
+  verdict: Verdict;
+  dns: number | null;
+  dnsDiffers: boolean;
+  tcp: number | null;
+  https: number | null;
+  status: number | null;
+  failure: Failure | null;
+}
+
 export interface TargetView {
   id: string;
   name: string;
@@ -44,6 +63,7 @@ export interface Settings {
   notifications: boolean;
   retentionDays: number;
   debug: boolean;
+  sites: string[];
 }
 
 export interface Init {
@@ -60,6 +80,10 @@ export interface Backend {
   setAutostart(enabled: boolean): Promise<Settings>;
   setNotifications(enabled: boolean): Promise<Settings>;
   history(minutes: number): Promise<Minute[]>;
+  siteLists(): Promise<Category[]>;
+  checkSites(hosts: string[]): Promise<SiteResult[]>;
+  setSites(sites: string[]): Promise<Settings>;
+  onSite(handler: (result: SiteResult) => void): void;
   onHealth(handler: (snapshot: Snapshot) => void): void;
   minimize(): Promise<void>;
   hide(): Promise<void>;

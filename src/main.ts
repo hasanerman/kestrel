@@ -7,6 +7,7 @@ import "./styles.css";
 import { createBackend } from "./api";
 import { drawGraph } from "./graph";
 import { LANGUAGES, strings } from "./i18n";
+import { SitesView } from "./sites";
 import type { Backend, Minute, Outage, Range, Settings, Snapshot, TargetView, Theme } from "./types";
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -14,6 +15,7 @@ const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getEleme
 let backend: Backend;
 let settings: Settings;
 let latest: Snapshot | null = null;
+let sites: SitesView | null = null;
 let range: Range = 5;
 let minutes: Minute[] = [];
 
@@ -179,8 +181,6 @@ function renderSettings() {
   text("lbl-loss", t.loss);
   text("lbl-apps", t.apps);
   text("lbl-apps-later", t.appsLater);
-  text("lbl-sites", t.sites);
-  text("lbl-sites-later", t.sitesLater);
   text("lbl-settings", t.settings);
   text("lbl-language", t.language);
   text("lbl-language-hint", t.languageHint);
@@ -205,6 +205,7 @@ function renderSettings() {
     settings = await backend.setLanguage(id);
     renderSettings();
     renderHealth();
+    sites?.render();
   });
   renderOptions(
     "opt-theme",
@@ -257,6 +258,16 @@ async function start() {
   window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", renderHealth);
   window.addEventListener("resize", renderHealth);
   window.setInterval(() => void loadMinutes(), 30_000);
+
+  sites = new SitesView(
+    backend,
+    () => settings,
+    (next) => {
+      settings = next;
+    },
+    init.version,
+  );
+  await sites.start();
 
   renderSettings();
   renderHealth();

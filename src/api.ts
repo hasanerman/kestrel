@@ -2,7 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
-import type { Backend, Snapshot } from "./types";
+import type { Backend, SiteResult, Snapshot } from "./types";
 
 function tauriBackend(): Backend {
   return {
@@ -12,6 +12,12 @@ function tauriBackend(): Backend {
     setAutostart: (enabled) => invoke("set_autostart", { enabled }),
     setNotifications: (enabled) => invoke("set_notifications", { enabled }),
     history: (minutes) => invoke("history", { minutes }),
+    siteLists: () => invoke("site_lists"),
+    checkSites: (hosts) => invoke("check_sites", { hosts }),
+    setSites: (sites) => invoke("set_sites", { sites }),
+    onSite: (handler) => {
+      void listen<SiteResult>("site", (event) => handler(event.payload));
+    },
     onHealth: (handler) => {
       void listen<Snapshot>("health", (event) => handler(event.payload));
     },

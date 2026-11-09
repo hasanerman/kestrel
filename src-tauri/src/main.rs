@@ -7,6 +7,7 @@ mod i18n;
 mod log;
 mod notify;
 mod settings;
+mod sites;
 mod system;
 mod tray;
 
@@ -47,6 +48,9 @@ fn main() {
             commands::set_autostart,
             commands::set_notifications,
             commands::get_logs,
+            commands::site_lists,
+            commands::check_sites,
+            commands::set_sites,
             commands::quit,
         ])
         .build(tauri::generate_context!())

@@ -1,5 +1,5 @@
 import pkg from "../../package.json";
-import type { Backend, Condition, Kind, Minute, Outage, Settings, Snapshot, TargetView } from "../types";
+import type { Backend, Category, Condition, Kind, Minute, Outage, Settings, SiteResult, Snapshot, TargetView } from "../types";
 
 const TARGETS: { id: string; name: string; host: string; kind: Kind; base: number }[] = [
   { id: "router", name: "Router", host: "192.168.1.1", kind: "router", base: 2 },
@@ -8,6 +8,21 @@ const TARGETS: { id: string; name: string; host: string; kind: Kind; base: numbe
 ];
 
 const HOUR = 3_600_000;
+
+const CATEGORIES: Category[] = [
+  { id: "social", hosts: ["discord.com", "youtube.com", "x.com", "instagram.com", "reddit.com"] },
+  { id: "gaming", hosts: ["store.steampowered.com", "roblox.com", "playvalorant.com"] },
+  { id: "news", hosts: ["wikipedia.org", "bbc.com"] },
+  { id: "dev", hosts: ["github.com", "npmjs.com"] },
+];
+
+function fakeSite(host: string): SiteResult {
+  const base = { host, dns: 12, dnsDiffers: false, tcp: 30, https: 180, status: 200, failure: null };
+  if (host === "discord.com") return { ...base, verdict: "dpiBlocked", https: null, status: null, failure: "reset" };
+  if (host === "x.com") return { ...base, verdict: "dnsBlocked", tcp: null, https: null, status: null, failure: "blockPage" };
+  if (host === "roblox.com") return { ...base, verdict: "dnsBlocked", dnsDiffers: true, https: null, status: null, failure: "timeout" };
+  return { ...base, verdict: "works", dns: 8 + Math.round(Math.random() * 30), tcp: 15 + Math.round(Math.random() * 40) };
+}
 
 function summarize(id: string, name: string, host: string, kind: Kind, history: (number | null)[]): TargetView {
   const recent = history.slice(-60);
@@ -37,9 +52,11 @@ export function mockBackend(): Backend {
     notifications: true,
     retentionDays: 30,
     debug: false,
+    sites: ["example.com"],
   };
   const histories = TARGETS.map(() => [] as (number | null)[]);
   const handlers: ((snapshot: Snapshot) => void)[] = [];
+  const siteHandlers: ((result: SiteResult) => void)[] = [];
   const started = Date.now() - 95_000;
   const yesterday = new Date();
   yesterday.setDate(yesterday.getDate() - 1);
@@ -104,6 +121,28 @@ export function mockBackend(): Backend {
     setTheme: (theme) => update({ theme }),
     setAutostart: (autostart) => update({ autostart }),
     setNotifications: (notifications) => update({ notifications }),
+    async siteLists() {
+      return CATEGORIES;
+    },
+    async checkSites(hosts) {
+      const results = await Promise.all(
+        hosts.map(
+          (host, i) =>
+            new Promise<SiteResult>((resolve) =>
+              window.setTimeout(() => {
+                const result = fakeSite(host);
+                siteHandlers.forEach((handler) => handler(result));
+                resolve(result);
+              }, 300 + i * 120),
+            ),
+        ),
+      );
+      return results;
+    },
+    setSites: (sites) => update({ sites }),
+    onSite(handler) {
+      siteHandlers.push(handler);
+    },
     async history(minutes) {
       return minutesFor(minutes);
     },

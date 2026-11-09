@@ -15,6 +15,7 @@ pub struct Settings {
     pub notifications: bool,
     pub retention_days: u32,
     pub debug: bool,
+    pub sites: Vec<String>,
 }
 
 impl Default for Settings {
@@ -26,6 +27,7 @@ impl Default for Settings {
             notifications: true,
             retention_days: 30,
             debug: false,
+            sites: Vec::new(),
         }
     }
 }
@@ -57,6 +59,16 @@ impl Settings {
             "en"
         }
         .into();
+    }
+
+    pub fn set_sites(&mut self, sites: &[String]) {
+        let mut clean: Vec<String> = Vec::new();
+        for site in sites.iter().filter_map(|s| crate::sites::normalize(s)) {
+            if !clean.contains(&site) {
+                clean.push(site);
+            }
+        }
+        self.sites = clean;
     }
 
     pub fn set_theme(&mut self, theme: &str) {
@@ -108,6 +120,13 @@ mod tests {
         assert_eq!(settings.language, "ru");
         settings.set_language("de-DE");
         assert_eq!(settings.language, "en");
+    }
+
+    #[test]
+    fn sites_are_cleaned() {
+        let mut settings = Settings::default();
+        settings.set_sites(&["https://Example.com/x".into(), "example.com".into(), "nope".into()]);
+        assert_eq!(settings.sites, vec!["example.com"]);
     }
 
     #[test]
