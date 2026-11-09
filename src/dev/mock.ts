@@ -115,7 +115,8 @@ export function mockBackend(): Backend {
         const lower = language.toLowerCase();
         settings.language = lower.startsWith("tr") ? "tr" : lower.startsWith("ru") ? "ru" : "en";
       }
-      return { settings, platform: params.get("platform") ?? "windows", version: pkg.version, health: snapshot() };
+      const update = params.get("update") !== null ? { version: "0.2.0", notes: "- Speed test\n- Game server targets" } : null;
+      return { settings, platform: params.get("platform") ?? "windows", version: pkg.version, health: snapshot(), update };
     },
     setLanguage: (language) => update({ language }),
     setTheme: (theme) => update({ theme }),
@@ -149,6 +150,10 @@ export function mockBackend(): Backend {
     onHealth(handler) {
       handlers.push(handler);
     },
+    async installUpdate() {
+      await new Promise((resolve) => window.setTimeout(resolve, 1500));
+    },
+    onUpdate() {},
     async minimize() {},
     async hide() {},
     async quit() {},

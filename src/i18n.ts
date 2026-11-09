@@ -68,6 +68,11 @@ const en = {
   on: "On",
   off: "Off",
   quit: "Quit kestrel",
+  updateReady: (version: string) => `kestrel ${version} is available`,
+  updateInstall: "Update",
+  updateInstalling: "Updating",
+  updateNotes: "What's new",
+  updateFailed: "Update failed. Try again later.",
 };
 
 type Strings = typeof en;
@@ -135,6 +140,11 @@ const tr: Strings = {
   on: "Açık",
   off: "Kapalı",
   quit: "kestrel'den çık",
+  updateReady: (version: string) => `kestrel ${version} hazır`,
+  updateInstall: "Güncelle",
+  updateInstalling: "Güncelleniyor",
+  updateNotes: "Yenilikler",
+  updateFailed: "Güncelleme başarısız. Sonra tekrar dene.",
 };
 
 const ru: Strings = {
@@ -200,6 +210,11 @@ const ru: Strings = {
   on: "Вкл",
   off: "Выкл",
   quit: "Выйти из kestrel",
+  updateReady: (version: string) => `Доступна kestrel ${version}`,
+  updateInstall: "Обновить",
+  updateInstalling: "Обновление",
+  updateNotes: "Что нового",
+  updateFailed: "Не удалось обновить. Попробуйте позже.",
 };
 
 export const LANGUAGES: { id: Language; name: string }[] = [

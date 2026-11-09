@@ -6,6 +6,7 @@ use crate::health::{Archive, Condition, Latest, Snapshot};
 use crate::settings::{Settings, Store};
 use crate::sites::lists::{Category, CATEGORIES};
 use crate::sites::{self, SiteResult};
+use crate::updater::{self, Available};
 use crate::{autostart, log, tray};
 
 #[derive(Serialize)]
@@ -15,6 +16,7 @@ pub struct Init {
     platform: &'static str,
     version: &'static str,
     health: Option<Snapshot>,
+    update: Option<Available>,
 }
 
 #[tauri::command]
@@ -28,6 +30,7 @@ pub fn init(app: AppHandle, store: State<Store>, latest: State<Latest>, language
         platform: std::env::consts::OS,
         version: env!("CARGO_PKG_VERSION"),
         health: latest.get(),
+        update: updater::available(&app),
     }
 }
 
@@ -88,6 +91,11 @@ pub fn set_sites(store: State<Store>, sites: Vec<String>) -> Settings {
 #[tauri::command]
 pub fn get_logs() -> Vec<String> {
     log::recent()
+}
+
+#[tauri::command]
+pub async fn install_update(app: AppHandle) -> Result<(), String> {
+    updater::install(app).await
 }
 
 #[tauri::command]

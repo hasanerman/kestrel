@@ -2,7 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
-import type { Backend, SiteResult, Snapshot } from "./types";
+import type { Backend, SiteResult, Snapshot, UpdateInfo } from "./types";
 
 function tauriBackend(): Backend {
   return {
@@ -20,6 +20,10 @@ function tauriBackend(): Backend {
     },
     onHealth: (handler) => {
       void listen<Snapshot>("health", (event) => handler(event.payload));
+    },
+    installUpdate: () => invoke("install_update"),
+    onUpdate: (handler) => {
+      void listen<UpdateInfo>("update", (event) => handler(event.payload));
     },
     minimize: () => getCurrentWindow().minimize(),
     hide: () => getCurrentWindow().hide(),

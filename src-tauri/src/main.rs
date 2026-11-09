@@ -10,6 +10,7 @@ mod settings;
 mod sites;
 mod system;
 mod tray;
+mod updater;
 
 use tauri::{Manager, RunEvent, WindowEvent};
 
@@ -19,6 +20,8 @@ fn main() {
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| tray::show_window(app)))
         .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .manage(updater::Pending::default())
         .setup(move |app| {
             if let Ok(dir) = app.path().app_log_dir() {
                 log::init(dir, app.handle());
@@ -28,6 +31,7 @@ fn main() {
             tray::create(app.handle(), &store.get())?;
             app.manage(store);
             health::start(app.handle().clone());
+            updater::watch(app.handle().clone());
             if !start_in_tray {
                 tray::show_window(app.handle());
             }
@@ -52,6 +56,7 @@ fn main() {
             commands::check_sites,
             commands::set_sites,
             commands::quit,
+            commands::install_update,
         ])
         .build(tauri::generate_context!())
         .expect("failed to start kestrel");

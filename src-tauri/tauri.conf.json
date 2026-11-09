@@ -30,8 +30,18 @@
       "devCsp": "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; script-src 'self'; connect-src 'self' ws://localhost:1420"
     }
   },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDk2MTI4NEQ2NzkzRDA2QjkKUldTNUJqMTUxb1FTbGxkTW5yL2FlV0o5QUNIK2xwSnAxRzlrWVgvUWd3YjFuckNmSi9nSjFOczUK",
+      "endpoints": ["https://github.com/hasanerman/kestrel/releases/latest/download/latest.json"],
+      "windows": {
+        "installMode": "passive"
+      }
+    }
+  },
   "bundle": {
     "active": true,
+    "createUpdaterArtifacts": true,
     "targets": ["nsis", "app", "dmg", "deb", "appimage"],
     "icon": [
       "icons/32x32.png",

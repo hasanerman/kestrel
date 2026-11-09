@@ -507,6 +507,44 @@ h1 {
   opacity: 0.4;
 }
 
+.update {
+  position: absolute;
+  left: 26px;
+  right: 26px;
+  bottom: 14px;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px 8px 14px;
+  border-radius: 9px;
+  background: var(--bg);
+  box-shadow: 0 0 0 1px var(--line-2), 0 8px 24px rgba(0, 0, 0, 0.08);
+  font-size: 12px;
+}
+
+.update[hidden] {
+  display: none;
+}
+
+.update #update-text {
+  flex: 1;
+  color: var(--soft);
+}
+
+.update .notes {
+  flex-basis: 100%;
+  white-space: pre-line;
+  color: var(--muted);
+  max-height: 120px;
+  overflow-y: auto;
+}
+
+.update .notes[hidden] {
+  display: none;
+}
+
 .later {
   color: var(--muted);
 }

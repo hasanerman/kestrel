@@ -8,7 +8,7 @@ import { createBackend } from "./api";
 import { drawGraph } from "./graph";
 import { LANGUAGES, strings } from "./i18n";
 import { SitesView } from "./sites";
-import type { Backend, Minute, Outage, Range, Settings, Snapshot, TargetView, Theme } from "./types";
+import type { Backend, Minute, Outage, Range, Settings, Snapshot, TargetView, Theme, UpdateInfo } from "./types";
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -16,6 +16,8 @@ let backend: Backend;
 let settings: Settings;
 let latest: Snapshot | null = null;
 let sites: SitesView | null = null;
+let update: UpdateInfo | null = null;
+let updating = false;
 let range: Range = 5;
 let minutes: Minute[] = [];
 
@@ -197,6 +199,7 @@ function renderSettings() {
   text("lbl-autostart-hint", t.autostartHint);
   text("val-autostart", settings.autostart ? t.on : t.off);
   text("btn-quit", t.quit);
+  renderUpdate();
   renderRange();
   $<HTMLInputElement>("chk-notifications").checked = settings.notifications;
   $<HTMLInputElement>("chk-autostart").checked = settings.autostart;
@@ -217,6 +220,31 @@ function renderSettings() {
       renderHealth();
     },
   );
+}
+
+function renderUpdate() {
+  const t = strings(settings.language);
+  $("update").hidden = !update;
+  if (!update) return;
+  text("update-text", t.updateReady(update.version));
+  text("btn-update", updating ? t.updateInstalling : t.updateInstall);
+  $<HTMLButtonElement>("btn-update").disabled = updating;
+  text("btn-notes", t.updateNotes);
+  $("btn-notes").hidden = !update.notes;
+  text("update-notes", update.notes ?? "");
+}
+
+async function installUpdate() {
+  if (updating) return;
+  updating = true;
+  renderUpdate();
+  try {
+    await backend.installUpdate();
+  } catch {
+    updating = false;
+    renderUpdate();
+    text("update-text", strings(settings.language).updateFailed);
+  }
 }
 
 function showPage(page: string) {
@@ -249,6 +277,16 @@ async function start() {
       box.checked = !box.checked;
     }
     renderSettings();
+  };
+
+  update = init.update;
+  backend.onUpdate((info) => {
+    update = info;
+    renderUpdate();
+  });
+  $("btn-update").onclick = () => void installUpdate();
+  $("btn-notes").onclick = () => {
+    $("update-notes").hidden = !$("update-notes").hidden;
   };
 
   backend.onHealth((snapshot) => {

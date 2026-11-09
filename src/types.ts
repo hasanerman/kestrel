@@ -66,11 +66,17 @@ export interface Settings {
   sites: string[];
 }
 
+export interface UpdateInfo {
+  version: string;
+  notes: string | null;
+}
+
 export interface Init {
   settings: Settings;
   platform: string;
   version: string;
   health: Snapshot | null;
+  update: UpdateInfo | null;
 }
 
 export interface Backend {
@@ -85,6 +91,8 @@ export interface Backend {
   setSites(sites: string[]): Promise<Settings>;
   onSite(handler: (result: SiteResult) => void): void;
   onHealth(handler: (snapshot: Snapshot) => void): void;
+  installUpdate(): Promise<void>;
+  onUpdate(handler: (info: UpdateInfo) => void): void;
   minimize(): Promise<void>;
   hide(): Promise<void>;
   quit(): Promise<void>;
