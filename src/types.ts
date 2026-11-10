@@ -93,6 +93,10 @@ export interface Backend {
   onHealth(handler: (snapshot: Snapshot) => void): void;
   installUpdate(): Promise<void>;
   onUpdate(handler: (info: UpdateInfo) => void): void;
+  setRetention(days: number): Promise<Settings>;
+  openRepository(): Promise<void>;
+  reportIssue(): Promise<void>;
+  diagnostics(): Promise<string>;
   minimize(): Promise<void>;
   hide(): Promise<void>;
   quit(): Promise<void>;

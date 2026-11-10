@@ -25,6 +25,7 @@ const RANGES: Range[] = [5, 60, 1440];
 const LIVE_SLOTS = 300;
 
 const THEMES: Theme[] = ["system", "light", "dark"];
+const RETENTION = [7, 30, 90];
 
 function text(id: string, value: string) {
   $(id).textContent = value;
@@ -199,6 +200,22 @@ function renderSettings() {
   text("lbl-autostart-hint", t.autostartHint);
   text("val-autostart", settings.autostart ? t.on : t.off);
   text("btn-quit", t.quit);
+  text("lbl-data", t.data);
+  text("lbl-data-hint", t.dataHint);
+  text("val-data", t.days(settings.retentionDays));
+  text("lbl-help", t.help);
+  text("lbl-help-hint", t.helpHint);
+  text("btn-diagnostics", t.copyDiagnostics);
+  text("btn-report", t.reportIssue);
+  renderOptions(
+    "opt-data",
+    RETENTION.map((days) => ({ id: String(days), name: t.days(days) })),
+    String(settings.retentionDays),
+    async (id) => {
+      settings = await backend.setRetention(Number(id));
+      renderSettings();
+    },
+  );
   renderUpdate();
   renderRange();
   $<HTMLInputElement>("chk-notifications").checked = settings.notifications;
@@ -259,12 +276,23 @@ async function start() {
   settings = init.settings;
   latest = init.health;
   document.body.dataset.platform = init.platform;
-  text("version", `kestrel ${init.version}`);
 
   document.querySelectorAll<HTMLElement>(".tab").forEach((tab) => (tab.onclick = () => showPage(tab.dataset.page ?? "health")));
   $("btn-minimize").onclick = () => void backend.minimize();
   $("btn-hide").onclick = () => void backend.hide();
   $("btn-quit").onclick = () => void backend.quit();
+  $("btn-source").onclick = () => void backend.openRepository();
+  $("btn-report").onclick = () => void backend.reportIssue();
+  $("btn-diagnostics").onclick = async () => {
+    const t = strings(settings.language);
+    try {
+      await navigator.clipboard.writeText(await backend.diagnostics());
+      text("btn-diagnostics", t.copied);
+    } catch {
+      text("btn-diagnostics", t.copyFailed);
+    }
+    window.setTimeout(() => text("btn-diagnostics", strings(settings.language).copyDiagnostics), 1500);
+  };
   $<HTMLInputElement>("chk-notifications").onchange = async (event) => {
     settings = await backend.setNotifications((event.target as HTMLInputElement).checked);
     renderSettings();

@@ -71,6 +71,14 @@ impl Settings {
         self.sites = clean;
     }
 
+    pub fn set_retention(&mut self, days: u32) {
+        self.retention_days = match days {
+            0..=7 => 7,
+            8..=30 => 30,
+            _ => 90,
+        };
+    }
+
     pub fn set_theme(&mut self, theme: &str) {
         self.theme = match theme {
             "light" | "dark" => theme,
@@ -127,6 +135,17 @@ mod tests {
         let mut settings = Settings::default();
         settings.set_sites(&["https://Example.com/x".into(), "example.com".into(), "nope".into()]);
         assert_eq!(settings.sites, vec!["example.com"]);
+    }
+
+    #[test]
+    fn retention_snaps_to_choices() {
+        let mut settings = Settings::default();
+        settings.set_retention(3);
+        assert_eq!(settings.retention_days, 7);
+        settings.set_retention(30);
+        assert_eq!(settings.retention_days, 30);
+        settings.set_retention(400);
+        assert_eq!(settings.retention_days, 90);
     }
 
     #[test]

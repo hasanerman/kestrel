@@ -25,6 +25,10 @@ function tauriBackend(): Backend {
     onUpdate: (handler) => {
       void listen<UpdateInfo>("update", (event) => handler(event.payload));
     },
+    setRetention: (days) => invoke("set_retention", { days }),
+    openRepository: () => invoke("open_repository"),
+    reportIssue: () => invoke("report_issue"),
+    diagnostics: () => invoke("diagnostics"),
     minimize: () => getCurrentWindow().minimize(),
     hide: () => getCurrentWindow().hide(),
     quit: () => invoke("quit"),

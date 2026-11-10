@@ -7,7 +7,7 @@ use crate::settings::{Settings, Store};
 use crate::sites::lists::{Category, CATEGORIES};
 use crate::sites::{self, SiteResult};
 use crate::updater::{self, Available};
-use crate::{autostart, log, tray};
+use crate::{autostart, log, system, tray};
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -86,6 +86,40 @@ pub async fn check_sites(app: AppHandle, hosts: Vec<String>) -> Vec<SiteResult> 
 #[tauri::command]
 pub fn set_sites(store: State<Store>, sites: Vec<String>) -> Settings {
     store.update(|s| s.set_sites(&sites))
+}
+
+#[tauri::command]
+pub fn set_retention(store: State<Store>, days: u32) -> Settings {
+    store.update(|s| s.set_retention(days))
+}
+
+#[tauri::command]
+pub fn open_repository() -> Result<(), String> {
+    system::open_url(system::REPOSITORY)
+}
+
+#[tauri::command]
+pub fn report_issue() -> Result<(), String> {
+    system::open_url(&format!("{}/issues/new", system::REPOSITORY))
+}
+
+#[tauri::command]
+pub fn diagnostics(store: State<Store>, latest: State<Latest>) -> String {
+    let settings = store.get();
+    let mut out = vec![
+        format!("kestrel {}", env!("CARGO_PKG_VERSION")),
+        format!("os: {} {}", std::env::consts::OS, std::env::consts::ARCH),
+        format!("language: {} theme: {}", settings.language, settings.theme),
+        format!("autostart: {} notifications: {}", settings.autostart, settings.notifications),
+        format!("retention: {} days, own sites: {}", settings.retention_days, settings.sites.len()),
+    ];
+    if let Some(snapshot) = latest.get() {
+        out.push(format!("condition: {:?} method: {:?}", snapshot.condition, snapshot.method));
+        out.push(format!("outages recorded: {}", snapshot.recent.len()));
+    }
+    out.push(String::new());
+    out.extend(log::recent());
+    out.join("\n")
 }
 
 #[tauri::command]

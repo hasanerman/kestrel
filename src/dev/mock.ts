@@ -154,6 +154,16 @@ export function mockBackend(): Backend {
       await new Promise((resolve) => window.setTimeout(resolve, 1500));
     },
     onUpdate() {},
+    setRetention: (retentionDays) => update({ retentionDays }),
+    async openRepository() {
+      window.open("https://github.com/hasanerman/kestrel", "_blank");
+    },
+    async reportIssue() {
+      window.open("https://github.com/hasanerman/kestrel/issues/new", "_blank");
+    },
+    async diagnostics() {
+      return `kestrel ${pkg.version}\nos: windows x86_64`;
+    },
     async minimize() {},
     async hide() {},
     async quit() {},
