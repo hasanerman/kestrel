@@ -194,7 +194,10 @@ export class SitesView {
           const toggle = document.createElement("button");
           toggle.type = "button";
           toggle.className = this.solving.has(host) ? "solve-toggle on" : "solve-toggle";
-          toggle.textContent = this.solving.has(host) ? t.hideSolve : `${t.howToSolve} ›`;
+          toggle.title = this.solving.has(host) ? t.hideSolve : t.howToSolve;
+          toggle.setAttribute("aria-label", toggle.title);
+          toggle.innerHTML =
+            '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" /></svg>';
           toggle.onclick = (event) => {
             event.stopPropagation();
             if (this.solving.has(host)) this.solving.delete(host);
