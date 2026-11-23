@@ -4,6 +4,39 @@ use std::io;
 use std::process::{Command, Output, Stdio};
 
 pub const REPOSITORY: &str = "https://github.com/hasanerman/kestrel";
+pub const FREEDPI: &str = "https://github.com/hasanerman/FreeDPI";
+
+#[cfg(windows)]
+fn freedpi_launcher() -> Option<Command> {
+    let base = std::path::PathBuf::from(std::env::var_os("ProgramFiles")?).join("FreeDPI");
+    let exe = ["freedpi.exe", "FreeDPI.exe"].iter().map(|name| base.join(name)).find(|path| path.exists())?;
+    Some(Command::new(exe))
+}
+
+#[cfg(target_os = "macos")]
+fn freedpi_launcher() -> Option<Command> {
+    let app = std::path::Path::new("/Applications/FreeDPI.app");
+    if !app.exists() {
+        return None;
+    }
+    let mut command = Command::new("/usr/bin/open");
+    command.arg(app);
+    Some(command)
+}
+
+#[cfg(not(any(windows, target_os = "macos")))]
+fn freedpi_launcher() -> Option<Command> {
+    None
+}
+
+pub fn open_freedpi() -> Result<bool, String> {
+    if let Some(mut command) = freedpi_launcher() {
+        command.spawn().map_err(|e| e.to_string())?;
+        return Ok(true);
+    }
+    open_url(&format!("{FREEDPI}/releases/latest"))?;
+    Ok(false)
+}
 
 pub fn open_url(url: &str) -> Result<(), String> {
     #[cfg(windows)]

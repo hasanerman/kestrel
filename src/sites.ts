@@ -185,6 +185,22 @@ export class SitesView {
         steps.textContent = this.steps(result);
         row.append(steps);
       }
+      if (result.verdict === "dnsBlocked" || result.verdict === "dpiBlocked") {
+        const open = document.createElement("button");
+        open.type = "button";
+        open.className = "freedpi";
+        open.textContent = t.openFreedpi;
+        open.onclick = async (event) => {
+          event.stopPropagation();
+          try {
+            const launched = await this.backend.openFreedpi();
+            open.textContent = launched ? t.freedpiOpened : t.freedpiDownload;
+          } catch {
+            open.textContent = t.copyFailed;
+          }
+        };
+        row.append(open);
+      }
     }
     return row;
   }

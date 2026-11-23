@@ -1,11 +1,12 @@
 use serde::Serialize;
 use tauri::{AppHandle, Manager, State};
 
-use crate::health::history::Minute;
+use crate::health::history::{Hour, Minute};
 use crate::health::{Archive, Condition, Latest, Snapshot};
-use crate::settings::{Settings, Store};
+use crate::settings::{BlockedApp, Settings, Store};
 use crate::sites::lists::{Category, CATEGORIES};
 use crate::sites::{self, SiteResult};
+use crate::traffic::{self, Traffic};
 use crate::updater::{self, Available};
 use crate::{autostart, log, system, tray};
 
@@ -42,6 +43,16 @@ pub fn health(latest: State<Latest>) -> Option<Snapshot> {
 #[tauri::command]
 pub fn history(archive: State<Archive>, minutes: u32) -> Vec<Minute> {
     archive.minutes(minutes.min(60 * 24 * 31))
+}
+
+#[tauri::command]
+pub fn hours(archive: State<Archive>, days: u32) -> Vec<Hour> {
+    archive.hours(days.clamp(1, 90))
+}
+
+#[tauri::command]
+pub fn traffic(monitor: State<Traffic>) -> Option<traffic::Snapshot> {
+    monitor.latest()
 }
 
 #[tauri::command]
@@ -120,6 +131,41 @@ pub fn diagnostics(store: State<Store>, latest: State<Latest>) -> String {
     out.push(String::new());
     out.extend(log::recent());
     out.join("\n")
+}
+
+#[tauri::command]
+pub fn open_freedpi() -> Result<bool, String> {
+    system::open_freedpi()
+}
+
+#[tauri::command]
+pub async fn block_app(store: State<'_, Store>, name: String, path: String) -> Result<Settings, String> {
+    let (rule, program) = (name.clone(), path.clone());
+    tauri::async_runtime::spawn_blocking(move || crate::firewall::block(&rule, &program))
+        .await
+        .map_err(|e| e.to_string())?
+        .inspect_err(|err| log::error(format!("block {name}: {err}")))?;
+    log::write(format!("blocked {name}"));
+    Ok(store.update(|s| {
+        s.blocked.retain(|b| b.name != name);
+        s.blocked.push(BlockedApp { name, path });
+    }))
+}
+
+#[tauri::command]
+pub async fn unblock_app(store: State<'_, Store>, name: String) -> Result<Settings, String> {
+    let rule = name.clone();
+    tauri::async_runtime::spawn_blocking(move || crate::firewall::unblock(&rule))
+        .await
+        .map_err(|e| e.to_string())?
+        .inspect_err(|err| log::error(format!("unblock {name}: {err}")))?;
+    log::write(format!("unblocked {name}"));
+    Ok(store.update(|s| s.blocked.retain(|b| b.name != name)))
+}
+
+#[tauri::command]
+pub async fn speed_test(app: AppHandle) -> Result<crate::speed::Result, String> {
+    crate::speed::run(app).await
 }
 
 #[tauri::command]

@@ -1,6 +1,6 @@
 [package]
 name = "kestrel"
-version = "0.1.0"
+version = "0.2.0"
 description = "Watches your internet connection, the apps that use it and the sites you can reach"
 authors = ["kestrel contributors"]
 license = "GPL-3.0-only"
@@ -20,12 +20,10 @@ serde_json = "1"
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "time", "sync"] }
 rusqlite = { version = "0.41", features = ["bundled"] }
 reqwest = { version = "0.13", default-features = false, features = ["rustls", "json"] }
+socket2 = { version = "0.6", features = ["all"] }
 
 [target.'cfg(windows)'.dependencies]
-windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_NetworkManagement_IpHelper", "Win32_Networking_WinSock"] }
-
-[target.'cfg(unix)'.dependencies]
-socket2 = "0.6"
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_NetworkManagement_IpHelper", "Win32_Networking_WinSock", "Win32_System_IO", "Win32_System_Threading"] }
 
 [profile.release]
 codegen-units = 1

@@ -13,7 +13,7 @@ use tokio::time::MissedTickBehavior;
 
 use crate::settings::Store;
 use crate::{i18n, log, notify, tray};
-use history::{Cause, History, Minute, Outage};
+use history::{Cause, History, Hour, Minute, Outage};
 use ping::Method;
 
 const TICK: Duration = Duration::from_secs(1);
@@ -111,6 +111,12 @@ impl Archive {
     pub fn minutes(&self, minutes: u32) -> Vec<Minute> {
         let since = now_ms() - i64::from(minutes) * 60_000;
         self.run(|h| h.minutes_since(since)).unwrap_or_default()
+    }
+
+    pub fn hours(&self, days: u32) -> Vec<Hour> {
+        let now = now_ms();
+        let since = now - i64::from(days) * DAY_MS;
+        self.run(|h| h.hours_since(since, now)).unwrap_or_default()
     }
 
     fn recent(&self) -> Vec<Outage> {

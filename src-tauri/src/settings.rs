@@ -6,6 +6,13 @@ use std::sync::Mutex;
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager};
 
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BlockedApp {
+    pub name: String,
+    pub path: String,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct Settings {
@@ -16,6 +23,7 @@ pub struct Settings {
     pub retention_days: u32,
     pub debug: bool,
     pub sites: Vec<String>,
+    pub blocked: Vec<BlockedApp>,
 }
 
 impl Default for Settings {
@@ -28,6 +36,7 @@ impl Default for Settings {
             retention_days: 30,
             debug: false,
             sites: Vec::new(),
+            blocked: Vec::new(),
         }
     }
 }

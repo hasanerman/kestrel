@@ -3,7 +3,53 @@ export type Language = "en" | "tr" | "ru";
 export type Theme = "system" | "light" | "dark";
 export type Kind = "router" | "internet";
 export type Cause = "provider" | "local";
-export type Range = 5 | 60 | 1440;
+export type Range = 5 | 60 | 1440 | 10080;
+
+export type TrafficStatus = "starting" | "running" | "needsAdmin" | "unsupported" | "failed";
+
+export interface AppView {
+  name: string;
+  path: string | null;
+  down: number;
+  up: number;
+  totalDown: number;
+  totalUp: number;
+}
+
+export interface FlowView {
+  id: number;
+  app: string;
+  protocol: "tcp" | "udp";
+  label: string;
+  remote: string;
+  remotePort: number;
+  localPort: number;
+  name: string | null;
+  detail: string | null;
+  down: number;
+  up: number;
+  last: number;
+  sample: number[];
+  sampleOut: boolean;
+}
+
+export interface TrafficSnapshot {
+  status: TrafficStatus;
+  down: number;
+  up: number;
+  averageDown: number;
+  averageUp: number;
+  apps: AppView[];
+  flows: FlowView[];
+}
+
+export interface Hour {
+  at: number;
+  ping: number | null;
+  loss: number;
+  down: number;
+  samples: number;
+}
 
 export interface Outage {
   start: number;
@@ -64,6 +110,22 @@ export interface Settings {
   retentionDays: number;
   debug: boolean;
   sites: string[];
+  blocked: BlockedApp[];
+}
+
+export interface BlockedApp {
+  name: string;
+  path: string;
+}
+
+export interface SpeedResult {
+  download: number;
+  upload: number;
+}
+
+export interface SpeedProgress {
+  phase: "download" | "upload";
+  mbps: number;
 }
 
 export interface UpdateInfo {
@@ -86,10 +148,17 @@ export interface Backend {
   setAutostart(enabled: boolean): Promise<Settings>;
   setNotifications(enabled: boolean): Promise<Settings>;
   history(minutes: number): Promise<Minute[]>;
+  hours(days: number): Promise<Hour[]>;
   siteLists(): Promise<Category[]>;
   checkSites(hosts: string[]): Promise<SiteResult[]>;
   setSites(sites: string[]): Promise<Settings>;
   onSite(handler: (result: SiteResult) => void): void;
+  openFreedpi(): Promise<boolean>;
+  blockApp(name: string, path: string): Promise<Settings>;
+  unblockApp(name: string): Promise<Settings>;
+  speedTest(): Promise<SpeedResult>;
+  onSpeed(handler: (progress: SpeedProgress) => void): void;
+  onTraffic(handler: (snapshot: TrafficSnapshot) => void): void;
   onHealth(handler: (snapshot: Snapshot) => void): void;
   installUpdate(): Promise<void>;
   onUpdate(handler: (info: UpdateInfo) => void): void;

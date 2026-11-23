@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.2.0
+
+- Hourly view: a 7-day heat map of every hour with average ping, loss and drops, the worst hours of the day and 7-day uptime.
+- Traffic tab on Windows: live download and upload per app, a feed of every connection with the site name taken from DNS, TLS and HTTP, and a packet inspector that shows the first bytes of each connection. Nothing is stored or uploaded.
+- Block or allow internet access for any app with one click (Windows Firewall rules in a kestrel group, removed on uninstall).
+- Average download and upload rate since kestrel started, next to the live rate.
+- Speed test on the Health screen using Cloudflare's speed servers.
+- Sites blocked by DNS or DPI get an "Open with FreeDPI" button that starts FreeDPI or opens its download page.
+- The GitHub link is now shown at the bottom of every screen.
+
 ## 0.1.0
 
 - Live ping, jitter and packet loss to your router, Cloudflare and Google, measured with ICMP and a TCP fallback.

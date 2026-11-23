@@ -6,9 +6,11 @@ import "./styles.css";
 
 import { createBackend } from "./api";
 import { drawGraph } from "./graph";
+import { renderHeatmap, uptime } from "./heatmap";
 import { LANGUAGES, strings } from "./i18n";
 import { SitesView } from "./sites";
-import type { Backend, Minute, Outage, Range, Settings, Snapshot, TargetView, Theme, UpdateInfo } from "./types";
+import { TrafficView } from "./traffic";
+import type { Backend, Hour, Minute, Outage, Range, Settings, Snapshot, TargetView, Theme, UpdateInfo } from "./types";
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -16,12 +18,16 @@ let backend: Backend;
 let settings: Settings;
 let latest: Snapshot | null = null;
 let sites: SitesView | null = null;
+let traffic: TrafficView | null = null;
+let speedRunning = false;
 let update: UpdateInfo | null = null;
 let updating = false;
 let range: Range = 5;
 let minutes: Minute[] = [];
+let hours: Hour[] = [];
 
-const RANGES: Range[] = [5, 60, 1440];
+const RANGES: Range[] = [5, 60, 1440, 10080];
+const HOURLY: Range = 10080;
 const LIVE_SLOTS = 300;
 
 const THEMES: Theme[] = ["system", "light", "dark"];
@@ -80,7 +86,15 @@ function renderHealth() {
 
   const color = condition === "down" ? css("--red") : condition === "degraded" ? css("--amber") : css("--green");
   const canvas = $<HTMLCanvasElement>("graph");
-  if (range === 5) {
+  const hourly = range === HOURLY;
+  canvas.hidden = hourly;
+  $("heat").hidden = !hourly;
+  $("targets").hidden = hourly;
+  const up = uptime(hours);
+  text("uptime", up === null ? "–" : up >= 100 ? "100" : up.toFixed(2));
+  if (hourly) {
+    renderHeatmap($("heat"), hours, settings.language);
+  } else if (range === 5) {
     const graphed = snapshot.targets.find((target) => target.kind === "internet");
     if (graphed) drawGraph(canvas, graphed.history, color, LIVE_SLOTS);
   } else {
@@ -136,8 +150,17 @@ function renderFoot(snapshot: Snapshot) {
   foot.replaceChildren(`${t.lastDrop} `, strong(when(last.start)), ` · ${t.causes[last.cause]} · ${duration(last)}`);
 }
 
+async function loadHours() {
+  hours = await backend.hours(7);
+  renderHealth();
+}
+
 async function loadMinutes() {
   if (range === 5) return;
+  if (range === HOURLY) {
+    await loadHours();
+    return;
+  }
   minutes = await backend.history(range);
   renderHealth();
 }
@@ -182,8 +205,7 @@ function renderSettings() {
 
   text("lbl-jitter", t.jitter);
   text("lbl-loss", t.loss);
-  text("lbl-apps", t.apps);
-  text("lbl-apps-later", t.appsLater);
+  text("lbl-uptime", t.uptime);
   text("lbl-settings", t.settings);
   text("lbl-language", t.language);
   text("lbl-language-hint", t.languageHint);
@@ -200,6 +222,7 @@ function renderSettings() {
   text("lbl-autostart-hint", t.autostartHint);
   text("val-autostart", settings.autostart ? t.on : t.off);
   text("btn-quit", t.quit);
+  if (!speedRunning) text("btn-speed", t.speedTest);
   text("lbl-data", t.data);
   text("lbl-data-hint", t.dataHint);
   text("val-data", t.days(settings.retentionDays));
@@ -268,6 +291,7 @@ function showPage(page: string) {
   document.querySelectorAll<HTMLElement>(".page").forEach((p) => p.classList.toggle("on", p.id === `page-${page}`));
   document.querySelectorAll<HTMLElement>(".tab").forEach((b) => b.classList.toggle("on", b.dataset.page === page));
   if (page === "health") renderHealth();
+  traffic?.show(page === "apps");
 }
 
 async function start() {
@@ -282,6 +306,27 @@ async function start() {
   $("btn-hide").onclick = () => void backend.hide();
   $("btn-quit").onclick = () => void backend.quit();
   $("btn-source").onclick = () => void backend.openRepository();
+  backend.onSpeed((progress) => {
+    const t = strings(settings.language);
+    text("speed-result", `${progress.phase === "download" ? "↓" : "↑"} ${progress.mbps.toFixed(1)} Mbps`);
+    text("btn-speed", progress.phase === "download" ? t.speedDownload : t.speedUpload);
+  });
+  $("btn-speed").onclick = async () => {
+    if (speedRunning) return;
+    const t = strings(settings.language);
+    speedRunning = true;
+    $<HTMLButtonElement>("btn-speed").disabled = true;
+    text("btn-speed", t.speedDownload);
+    try {
+      const result = await backend.speedTest();
+      text("speed-result", `↓ ${result.download.toFixed(1)}  ↑ ${result.upload.toFixed(1)} Mbps`);
+    } catch {
+      text("speed-result", t.speedFailed);
+    }
+    speedRunning = false;
+    $<HTMLButtonElement>("btn-speed").disabled = false;
+    text("btn-speed", strings(settings.language).speedTest);
+  };
   $("btn-report").onclick = () => void backend.reportIssue();
   $("btn-diagnostics").onclick = async () => {
     const t = strings(settings.language);
@@ -324,6 +369,8 @@ async function start() {
   window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", renderHealth);
   window.addEventListener("resize", renderHealth);
   window.setInterval(() => void loadMinutes(), 30_000);
+  window.setInterval(() => void loadHours(), 300_000);
+  void loadHours();
 
   sites = new SitesView(
     backend,
@@ -334,6 +381,14 @@ async function start() {
     init.version,
   );
   await sites.start();
+  traffic = new TrafficView(
+    backend,
+    () => settings,
+    (next) => {
+      settings = next;
+    },
+  );
+  traffic.start();
 
   renderSettings();
   renderHealth();

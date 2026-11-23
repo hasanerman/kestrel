@@ -2,13 +2,16 @@
 
 mod autostart;
 mod commands;
+mod firewall;
 mod health;
 mod i18n;
 mod log;
 mod notify;
 mod settings;
 mod sites;
+mod speed;
 mod system;
+mod traffic;
 mod tray;
 mod updater;
 
@@ -31,6 +34,7 @@ fn main() {
             tray::create(app.handle(), &store.get())?;
             app.manage(store);
             health::start(app.handle().clone());
+            traffic::start(app.handle().clone());
             updater::watch(app.handle().clone());
             if !start_in_tray {
                 tray::show_window(app.handle());
@@ -47,11 +51,17 @@ fn main() {
             commands::init,
             commands::health,
             commands::history,
+            commands::hours,
+            commands::traffic,
             commands::set_language,
             commands::set_theme,
             commands::set_autostart,
             commands::set_notifications,
             commands::get_logs,
+            commands::open_freedpi,
+            commands::block_app,
+            commands::unblock_app,
+            commands::speed_test,
             commands::set_retention,
             commands::open_repository,
             commands::report_issue,
