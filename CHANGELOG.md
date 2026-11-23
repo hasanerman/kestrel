@@ -6,8 +6,9 @@
 - Traffic tab on Windows: live download and upload per app, a feed of every connection with the site name taken from DNS, TLS and HTTP, and a packet inspector that shows the first bytes of each connection. Nothing is stored or uploaded.
 - Block or allow internet access for any app with one click (Windows Firewall rules in a kestrel group, removed on uninstall).
 - Average download and upload rate since kestrel started, next to the live rate.
-- Speed test on the Health screen using Cloudflare's speed servers.
-- Sites blocked by DNS or DPI get an "Open with FreeDPI" button that starts FreeDPI or opens its download page.
+- Speed test on the Health screen using four parallel downloads from Cloudflare's speed servers.
+- Sites blocked by DNS or DPI get a "How to solve" panel that explains the block, opens the site in FreeDPI when it is installed (FreeDPI 1.0.2 or newer adds it to its list and connects), links to the FreeDPI download and shows FreeDPI on GitHub.
+- Blocking an app warns when Windows Firewall is off for the current network, because the rule has no effect then.
 - The GitHub link is now shown at the bottom of every screen.
 
 ## 0.1.0
