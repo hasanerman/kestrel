@@ -853,6 +853,53 @@ h1 {
   color: var(--faint);
 }
 
+.steps-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.solve-toggle {
+  all: unset;
+  flex: none;
+  margin-top: 3px;
+  font-size: 11px;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.solve-toggle:hover,
+.solve-toggle.on {
+  color: var(--text);
+}
+
+.solve {
+  margin: 8px 0 2px;
+  padding: 2px 0 2px 12px;
+  border-left: 2px solid var(--line-2);
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--soft);
+  cursor: default;
+}
+
+.solve-how {
+  margin-top: 3px;
+  color: var(--muted);
+}
+
+.solve-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 9px;
+}
+
+.block-text.warn {
+  color: var(--amber);
+  white-space: normal;
+}
+
 .freedpi {
   all: unset;
   margin-top: 5px;

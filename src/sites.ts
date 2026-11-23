@@ -11,6 +11,8 @@ export class SitesView {
   private pending = new Set<string>();
   private filter: Filter = "all";
   private open = new Set<string>();
+  private solving = new Set<string>();
+  private freedpi = false;
 
   constructor(
     private backend: Backend,
@@ -21,6 +23,7 @@ export class SitesView {
 
   async start() {
     this.categories = await this.backend.siteLists();
+    this.freedpi = await this.backend.freedpiInstalled().catch(() => false);
     this.backend.onSite((result) => {
       this.results.set(result.host, result);
       this.pending.delete(result.host);
@@ -160,6 +163,7 @@ export class SitesView {
       verdict.textContent = "–";
     }
     head.append(name, verdict);
+    const blocked = result && (result.verdict === "dnsBlocked" || result.verdict === "dpiBlocked");
     if (this.filter === "mine") {
       const remove = document.createElement("button");
       remove.type = "button";
@@ -180,29 +184,67 @@ export class SitesView {
         this.render();
       };
       if (this.open.has(host) || result.verdict !== "works") {
+        const line = document.createElement("div");
+        line.className = "steps-row";
         const steps = document.createElement("p");
         steps.className = "steps";
         steps.textContent = this.steps(result);
-        row.append(steps);
+        line.append(steps);
+        if (blocked) {
+          const toggle = document.createElement("button");
+          toggle.type = "button";
+          toggle.className = this.solving.has(host) ? "solve-toggle on" : "solve-toggle";
+          toggle.textContent = this.solving.has(host) ? t.hideSolve : `${t.howToSolve} ›`;
+          toggle.onclick = (event) => {
+            event.stopPropagation();
+            if (this.solving.has(host)) this.solving.delete(host);
+            else this.solving.add(host);
+            this.render();
+          };
+          line.append(toggle);
+        }
+        row.append(line);
       }
-      if (result.verdict === "dnsBlocked" || result.verdict === "dpiBlocked") {
-        const open = document.createElement("button");
-        open.type = "button";
-        open.className = "freedpi";
-        open.textContent = t.openFreedpi;
-        open.onclick = async (event) => {
-          event.stopPropagation();
-          try {
-            const launched = await this.backend.openFreedpi();
-            open.textContent = launched ? t.freedpiOpened : t.freedpiDownload;
-          } catch {
-            open.textContent = t.copyFailed;
-          }
-        };
-        row.append(open);
+      if (blocked && this.solving.has(host)) {
+        row.append(this.solvePanel(host, result.verdict === "dnsBlocked"));
       }
     }
     return row;
+  }
+
+  private solvePanel(host: string, dns: boolean) {
+    const t = strings(this.settings().language);
+    const panel = document.createElement("div");
+    panel.className = "solve";
+    panel.onclick = (event) => event.stopPropagation();
+    const why = document.createElement("p");
+    why.textContent = dns ? t.solveDns : t.solveDpi;
+    const how = document.createElement("p");
+    how.className = "solve-how";
+    how.textContent = this.freedpi ? t.solveWithFreedpi(host) : t.solveGetFreedpi;
+    const actions = document.createElement("div");
+    actions.className = "solve-actions";
+    const primary = document.createElement("button");
+    primary.type = "button";
+    primary.className = "btn";
+    primary.textContent = this.freedpi ? t.openInFreedpi : t.downloadFreedpi;
+    primary.onclick = async () => {
+      try {
+        const launched = await this.backend.openFreedpi(host);
+        primary.textContent = launched ? t.freedpiOpened : t.freedpiDownload;
+      } catch {
+        primary.textContent = t.copyFailed;
+      }
+    };
+    const repository = document.createElement("button");
+    repository.type = "button";
+    repository.className = "btn quiet";
+    repository.textContent = t.viewOnGithub;
+    repository.title = "github.com/hasanerman/FreeDPI";
+    repository.onclick = () => void this.backend.openFreedpiRepository();
+    actions.append(primary, repository);
+    panel.append(why, how, actions);
+    return panel;
   }
 
   private async copy() {

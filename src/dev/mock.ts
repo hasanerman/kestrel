@@ -164,10 +164,17 @@ export function mockBackend(): Backend {
       return minutesFor(minutes);
     },
     async openFreedpi() {
-      return false;
+      return params.get("freedpi") !== null;
+    },
+    async openFreedpiRepository() {
+      window.open("https://github.com/hasanerman/FreeDPI", "_blank");
+    },
+    async freedpiInstalled() {
+      return params.get("freedpi") !== null;
     },
     async blockApp(name, path) {
-      return update({ blocked: [...settings.blocked.filter((b) => b.name !== name), { name, path }] });
+      const next = await update({ blocked: [...settings.blocked.filter((b) => b.name !== name), { name, path }] });
+      return { settings: next, warning: params.get("firewall") === "off" ? "firewall_off:Private" : null };
     },
     async unblockApp(name) {
       return update({ blocked: settings.blocked.filter((b) => b.name !== name) });

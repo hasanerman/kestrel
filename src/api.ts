@@ -19,7 +19,9 @@ function tauriBackend(): Backend {
     onSite: (handler) => {
       void listen<SiteResult>("site", (event) => handler(event.payload));
     },
-    openFreedpi: () => invoke("open_freedpi"),
+    openFreedpi: (host) => invoke("open_freedpi", { host: host ?? null }),
+    freedpiInstalled: () => invoke("freedpi_installed"),
+    openFreedpiRepository: () => invoke("open_freedpi_repository"),
     blockApp: (name, path) => invoke("block_app", { name, path }),
     unblockApp: (name) => invoke("unblock_app", { name }),
     speedTest: () => invoke("speed_test"),

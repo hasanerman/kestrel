@@ -113,6 +113,11 @@ export interface Settings {
   blocked: BlockedApp[];
 }
 
+export interface BlockOutcome {
+  settings: Settings;
+  warning: string | null;
+}
+
 export interface BlockedApp {
   name: string;
   path: string;
@@ -153,8 +158,10 @@ export interface Backend {
   checkSites(hosts: string[]): Promise<SiteResult[]>;
   setSites(sites: string[]): Promise<Settings>;
   onSite(handler: (result: SiteResult) => void): void;
-  openFreedpi(): Promise<boolean>;
-  blockApp(name: string, path: string): Promise<Settings>;
+  openFreedpi(host?: string): Promise<boolean>;
+  freedpiInstalled(): Promise<boolean>;
+  openFreedpiRepository(): Promise<void>;
+  blockApp(name: string, path: string): Promise<BlockOutcome>;
   unblockApp(name: string): Promise<Settings>;
   speedTest(): Promise<SpeedResult>;
   onSpeed(handler: (progress: SpeedProgress) => void): void;
