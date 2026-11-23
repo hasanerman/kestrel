@@ -59,6 +59,8 @@ fn main() {
             commands::set_notifications,
             commands::get_logs,
             commands::open_freedpi,
+            commands::freedpi_installed,
+            commands::open_freedpi_repository,
             commands::block_app,
             commands::unblock_app,
             commands::speed_test,

@@ -29,9 +29,51 @@ fn freedpi_launcher() -> Option<Command> {
     None
 }
 
-pub fn open_freedpi() -> Result<bool, String> {
+const ELEVATION_REQUIRED: i32 = 740;
+
+#[cfg(windows)]
+fn launch_elevated(command: &Command, error: &std::io::Error) -> Result<(), String> {
+    if error.raw_os_error() != Some(ELEVATION_REQUIRED) {
+        return Err(error.to_string());
+    }
+    let quote = |value: &str| format!("'{}'", value.replace('\'', "''"));
+    let program = quote(&command.get_program().to_string_lossy());
+    let args: Vec<String> = command.get_args().map(|a| quote(&a.to_string_lossy())).collect();
+    let mut script = format!("Start-Process -FilePath {program} -Verb RunAs");
+    if !args.is_empty() {
+        script.push_str(&format!(" -ArgumentList {}", args.join(",")));
+    }
+    let mut elevate = Command::new("powershell");
+    elevate.args(["-NoProfile", "-NonInteractive", "-Command", &script]);
+    hide_window(&mut elevate);
+    elevate.spawn().map(|_| ()).map_err(|e| e.to_string())
+}
+
+#[cfg(not(windows))]
+fn launch_elevated(_command: &Command, error: &std::io::Error) -> Result<(), String> {
+    let _ = ELEVATION_REQUIRED;
+    Err(error.to_string())
+}
+
+pub fn open_freedpi_repository() -> Result<(), String> {
+    open_url(FREEDPI)
+}
+
+pub fn freedpi_installed() -> bool {
+    freedpi_launcher().is_some()
+}
+
+pub fn open_freedpi(host: Option<&str>) -> Result<bool, String> {
     if let Some(mut command) = freedpi_launcher() {
-        command.spawn().map_err(|e| e.to_string())?;
+        if let Some(host) = host {
+            if cfg!(target_os = "macos") {
+                command.arg("--args");
+            }
+            command.args(["--add-site", host]);
+        }
+        if let Err(error) = command.spawn() {
+            launch_elevated(&command, &error)?;
+        }
         return Ok(true);
     }
     open_url(&format!("{FREEDPI}/releases/latest"))?;

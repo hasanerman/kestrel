@@ -134,22 +134,43 @@ pub fn diagnostics(store: State<Store>, latest: State<Latest>) -> String {
 }
 
 #[tauri::command]
-pub fn open_freedpi() -> Result<bool, String> {
-    system::open_freedpi()
+pub fn open_freedpi_repository() -> Result<(), String> {
+    system::open_freedpi_repository()
 }
 
 #[tauri::command]
-pub async fn block_app(store: State<'_, Store>, name: String, path: String) -> Result<Settings, String> {
+pub fn freedpi_installed() -> bool {
+    system::freedpi_installed()
+}
+
+#[tauri::command]
+pub fn open_freedpi(host: Option<String>) -> Result<bool, String> {
+    let host = host.and_then(|h| crate::sites::normalize(&h));
+    system::open_freedpi(host.as_deref())
+}
+
+#[derive(Serialize)]
+pub struct BlockOutcome {
+    settings: Settings,
+    warning: Option<String>,
+}
+
+#[tauri::command]
+pub async fn block_app(store: State<'_, Store>, name: String, path: String) -> Result<BlockOutcome, String> {
     let (rule, program) = (name.clone(), path.clone());
-    tauri::async_runtime::spawn_blocking(move || crate::firewall::block(&rule, &program))
+    let warning = tauri::async_runtime::spawn_blocking(move || crate::firewall::block(&rule, &program))
         .await
         .map_err(|e| e.to_string())?
         .inspect_err(|err| log::error(format!("block {name}: {err}")))?;
-    log::write(format!("blocked {name}"));
-    Ok(store.update(|s| {
+    match &warning {
+        Some(warning) => log::warn(format!("blocked {name}, but {warning}")),
+        None => log::write(format!("blocked {name}")),
+    }
+    let settings = store.update(|s| {
         s.blocked.retain(|b| b.name != name);
         s.blocked.push(BlockedApp { name, path });
-    }))
+    });
+    Ok(BlockOutcome { settings, warning })
 }
 
 #[tauri::command]
