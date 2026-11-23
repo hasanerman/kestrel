@@ -1,13 +1,16 @@
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use serde::Serialize;
 use tauri::{AppHandle, Emitter};
 
-const DOWNLOAD_URL: &str = "https://speed.cloudflare.com/__down?bytes=";
+const DOWNLOAD_URL: &str = "https://speed.cloudflare.com/__down?bytes=25000000";
 const UPLOAD_URL: &str = "https://speed.cloudflare.com/__up";
-const DOWNLOAD_BYTES: u64 = 100_000_000;
+const STREAMS: usize = 4;
 const UPLOAD_BYTES: usize = 20_000_000;
 const PHASE_LIMIT: Duration = Duration::from_secs(10);
+const REPORT_EVERY: Duration = Duration::from_millis(250);
 
 #[derive(Clone, Copy, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -42,33 +45,55 @@ fn client() -> std::result::Result<reqwest::Client, String> {
         .map_err(|e| e.to_string())
 }
 
-async fn download(app: &AppHandle, client: &reqwest::Client) -> std::result::Result<f64, String> {
-    let mut response = client
-        .get(format!("{DOWNLOAD_URL}{DOWNLOAD_BYTES}"))
-        .send()
-        .await
-        .map_err(|e| e.to_string())?;
-    let start = Instant::now();
-    let mut received: u64 = 0;
-    let mut reported = Instant::now();
+async fn stream(client: reqwest::Client, received: Arc<AtomicU64>, start: Instant) -> std::result::Result<(), String> {
     while start.elapsed() < PHASE_LIMIT {
-        match tokio::time::timeout(Duration::from_secs(5), response.chunk()).await {
-            Ok(Ok(Some(chunk))) => received += chunk.len() as u64,
-            _ => break,
+        let mut response = client.get(DOWNLOAD_URL).send().await.map_err(|e| e.to_string())?;
+        if !response.status().is_success() {
+            return Err(format!("HTTP {}", response.status()));
         }
-        if reported.elapsed() >= Duration::from_millis(250) {
-            reported = Instant::now();
-            let _ = app.emit("speed", Progress { phase: Phase::Download, mbps: mbps(received, start.elapsed()) });
+        loop {
+            if start.elapsed() >= PHASE_LIMIT {
+                return Ok(());
+            }
+            match tokio::time::timeout(Duration::from_secs(5), response.chunk()).await {
+                Ok(Ok(Some(chunk))) => {
+                    received.fetch_add(chunk.len() as u64, Ordering::Relaxed);
+                }
+                Ok(Ok(None)) => break,
+                Ok(Err(e)) => return Err(e.to_string()),
+                Err(_) => return Err("timed out".into()),
+            }
         }
     }
-    if received == 0 {
-        return Err("no data".into());
-    }
-    Ok(mbps(received, start.elapsed()))
+    Ok(())
 }
 
-async fn upload(app: &AppHandle, client: &reqwest::Client) -> std::result::Result<f64, String> {
-    let _ = app.emit("speed", Progress { phase: Phase::Upload, mbps: 0.0 });
+pub async fn download(client: &reqwest::Client, report: impl Fn(f64)) -> std::result::Result<f64, String> {
+    let received = Arc::new(AtomicU64::new(0));
+    let start = Instant::now();
+    let tasks: Vec<_> = (0..STREAMS)
+        .map(|_| tokio::spawn(stream(client.clone(), received.clone(), start)))
+        .collect();
+    while start.elapsed() < PHASE_LIMIT && !tasks.iter().all(|t| t.is_finished()) {
+        tokio::time::sleep(REPORT_EVERY).await;
+        report(mbps(received.load(Ordering::Relaxed), start.elapsed()));
+    }
+    let elapsed = start.elapsed();
+    let mut failure = None;
+    for task in tasks {
+        task.abort();
+        if let Ok(Err(error)) = task.await {
+            failure.get_or_insert(error);
+        }
+    }
+    let total = received.load(Ordering::Relaxed);
+    if total == 0 {
+        return Err(failure.unwrap_or_else(|| "no data".into()));
+    }
+    Ok(mbps(total, elapsed))
+}
+
+async fn upload(client: &reqwest::Client) -> std::result::Result<f64, String> {
     let body = vec![0u8; UPLOAD_BYTES];
     let start = Instant::now();
     let sent = tokio::time::timeout(PHASE_LIMIT + Duration::from_secs(5), client.post(UPLOAD_URL).body(body).send()).await;
@@ -83,8 +108,13 @@ async fn upload(app: &AppHandle, client: &reqwest::Client) -> std::result::Resul
 pub async fn run(app: AppHandle) -> std::result::Result<Result, String> {
     let client = client()?;
     crate::log::write("speed test started");
-    let download = download(&app, &client).await?;
-    let upload = upload(&app, &client).await.unwrap_or(0.0);
+    let download = download(&client, |mbps| {
+        let _ = app.emit("speed", Progress { phase: Phase::Download, mbps });
+    })
+    .await
+    .inspect_err(|e| crate::log::error(format!("speed test download: {e}")))?;
+    let _ = app.emit("speed", Progress { phase: Phase::Upload, mbps: 0.0 });
+    let upload = upload(&client).await.inspect_err(|e| crate::log::warn(format!("speed test upload: {e}"))).unwrap_or(0.0);
     crate::log::write(format!("speed test: {download} Mbps down, {upload} Mbps up"));
     Ok(Result { download, upload })
 }
@@ -97,5 +127,14 @@ mod tests {
     fn converts_bytes_to_mbps() {
         assert_eq!(mbps(12_500_000, Duration::from_secs(1)), 100.0);
         assert_eq!(mbps(1_000_000, Duration::from_secs(2)), 4.0);
+    }
+
+    #[tokio::test]
+    #[ignore]
+    async fn measures_real_download() {
+        let client = client().unwrap();
+        let result = download(&client, |mbps| println!("{mbps} Mbps")).await.unwrap();
+        println!("download {result} Mbps");
+        assert!(result > 0.0);
     }
 }
