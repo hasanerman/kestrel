@@ -113,7 +113,8 @@ export class TrafficView {
     if (!app) return;
     const blocked = this.settings().blocked.some((b) => b.name === app.name);
     const text = document.createElement("span");
-    text.className = "block-text";
+    text.className = this.error ? "block-text warn" : "block-text";
+    text.title = this.error ?? "";
     text.textContent = this.error ?? (blocked ? t.blockedNote(app.name) : app.path ?? t.noPath);
     const button = document.createElement("button");
     button.type = "button";
@@ -130,8 +131,13 @@ export class TrafficView {
     this.error = null;
     this.render();
     try {
-      const next = blocked ? await this.backend.unblockApp(app.name) : await this.backend.blockApp(app.name, app.path ?? "");
-      this.setSettings(next);
+      if (blocked) {
+        this.setSettings(await this.backend.unblockApp(app.name));
+      } else {
+        const outcome = await this.backend.blockApp(app.name, app.path ?? "");
+        this.setSettings(outcome.settings);
+        if (outcome.warning?.startsWith("firewall_off:")) this.error = t.firewallOff(outcome.warning.slice(13));
+      }
     } catch (err) {
       this.error = String(err).includes("needs_admin") ? t.blockNeedsAdmin : String(err).includes("unsupported") ? t.blockUnsupported : t.blockFailed;
     }
