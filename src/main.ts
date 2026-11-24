@@ -394,6 +394,10 @@ async function start() {
   renderHealth();
   const page = new URLSearchParams(location.search).get("page");
   if (page) showPage(page);
+  if (import.meta.env.DEV) {
+    const { demo } = await import("./dev/demo");
+    await demo();
+  }
 }
 
 void start();
