@@ -963,12 +963,54 @@ h1 {
   color: var(--red);
 }
 
+.target-add select {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  color: var(--text);
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--line-2);
+  padding: 5px 0;
+  outline: none;
+}
+
+.target-add select option {
+  color: var(--text);
+  background: var(--bg);
+}
+
+.target-add,
+#custom-add {
+  margin-top: 10px;
+  margin-bottom: 0;
+}
+
+.target-list {
+  margin-top: 10px;
+}
+
+.target-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 5px 0;
+  border-top: 1px solid var(--line);
+  font-size: 12.5px;
+  color: var(--soft);
+}
+
+.foot.busy b {
+  color: var(--amber);
+}
+
 .later {
   color: var(--muted);
 }
 
 #page-settings {
   overflow-y: auto;
+  padding-right: 12px;
 }
 
 .acc {

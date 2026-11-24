@@ -10,6 +10,7 @@ import { renderHeatmap, uptime } from "./heatmap";
 import { LANGUAGES, strings } from "./i18n";
 import { SitesView } from "./sites";
 import { TrafficView } from "./traffic";
+import { TargetsView } from "./targets";
 import type { Backend, Hour, Minute, Outage, Range, Settings, Snapshot, TargetView, Theme, UpdateInfo } from "./types";
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -19,6 +20,7 @@ let settings: Settings;
 let latest: Snapshot | null = null;
 let sites: SitesView | null = null;
 let traffic: TrafficView | null = null;
+let targets: TargetsView | null = null;
 let speedRunning = false;
 let update: UpdateInfo | null = null;
 let updating = false;
@@ -121,7 +123,7 @@ function when(at: number) {
   return `${prefix} ${clock(at)}`;
 }
 
-function duration(outage: Outage) {
+function duration(outage: Pick<Outage, "start" | "end">) {
   const t = strings(settings.language);
   const seconds = Math.max(1, Math.round(((outage.end ?? Date.now()) - outage.start) / 1000));
   if (seconds < 60) return `${seconds} ${t.units.s}`;
@@ -138,11 +140,21 @@ function renderFoot(snapshot: Snapshot) {
     return b;
   };
   foot.classList.toggle("down", snapshot.outage !== null);
+  foot.classList.toggle("busy", snapshot.outage === null && snapshot.spike !== null);
   if (snapshot.outage) {
     foot.replaceChildren(`${t.downSince} `, strong(clock(snapshot.outage.start)), ` · ${t.causes[snapshot.outage.cause]} · ${duration(snapshot.outage)}`);
     return;
   }
+  if (snapshot.spike) {
+    foot.replaceChildren(`${t.spikeSince} `, strong(clock(snapshot.spike.start)), ` · ${t.spikeSources[snapshot.spike.source]} · ${t.peak} ${snapshot.spike.peak} ms`);
+    return;
+  }
   const last = snapshot.recent[0];
+  const spike = snapshot.spikes[0];
+  if (spike && (!last || spike.start > last.start)) {
+    foot.replaceChildren(`${t.lastSpike} `, strong(when(spike.start)), ` · ${t.spikeSources[spike.source]} · ${duration(spike)} · ${t.peak} ${spike.peak} ms`);
+    return;
+  }
   if (!last) {
     foot.replaceChildren(t.noDrops);
     return;
@@ -249,6 +261,7 @@ function renderSettings() {
     renderSettings();
     renderHealth();
     sites?.render();
+    targets?.render();
   });
   renderOptions(
     "opt-theme",
@@ -381,6 +394,14 @@ async function start() {
     init.version,
   );
   await sites.start();
+  targets = new TargetsView(
+    backend,
+    () => settings,
+    (next) => {
+      settings = next;
+    },
+  );
+  void targets.start();
   traffic = new TrafficView(
     backend,
     () => settings,

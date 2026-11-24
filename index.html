@@ -104,6 +104,19 @@
             <div class="options" id="opt-theme"></div>
           </details>
           <details class="acc">
+            <summary><span id="lbl-targets"></span><span class="val" id="val-targets"></span></summary>
+            <p class="hint" id="lbl-targets-hint"></p>
+            <div class="add target-add">
+              <select id="game-select"></select>
+              <button class="btn quiet" id="btn-add-game" type="button">+</button>
+            </div>
+            <form class="add" id="custom-add" autocomplete="off">
+              <input id="custom-input" type="text" spellcheck="false" />
+              <button class="btn quiet" type="submit">+</button>
+            </form>
+            <div class="target-list" id="target-list"></div>
+          </details>
+          <details class="acc">
             <summary><span id="lbl-notifications"></span><span class="val" id="val-notifications"></span></summary>
             <label class="toggle"><span id="lbl-notifications-toggle"></span><input class="switch" id="chk-notifications" type="checkbox" /></label>
             <p class="hint" id="lbl-notifications-hint"></p>
