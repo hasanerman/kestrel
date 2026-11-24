@@ -24,6 +24,8 @@ pub struct Settings {
     pub debug: bool,
     pub sites: Vec<String>,
     pub blocked: Vec<BlockedApp>,
+    pub game_targets: Vec<String>,
+    pub custom_targets: Vec<String>,
 }
 
 impl Default for Settings {
@@ -37,6 +39,8 @@ impl Default for Settings {
             debug: false,
             sites: Vec::new(),
             blocked: Vec::new(),
+            game_targets: Vec::new(),
+            custom_targets: Vec::new(),
         }
     }
 }
@@ -88,6 +92,35 @@ impl Settings {
         };
     }
 
+    pub fn set_game_targets(&mut self, codes: &[String]) {
+        let mut clean: Vec<String> = Vec::new();
+        for code in codes.iter().map(|c| c.trim().to_ascii_lowercase()) {
+            let valid = (2..=6).contains(&code.len()) && code.chars().all(|c| c.is_ascii_alphanumeric());
+            if valid && !clean.contains(&code) && clean.len() < MAX_TARGETS {
+                clean.push(code);
+            }
+        }
+        self.game_targets = clean;
+    }
+
+    pub fn set_custom_targets(&mut self, hosts: &[String]) {
+        let mut clean: Vec<String> = Vec::new();
+        for host in hosts {
+            let trimmed = host.trim();
+            let normalized = match trimmed.parse::<std::net::Ipv4Addr>() {
+                Ok(ip) if ip.is_unspecified() || ip.is_broadcast() => None,
+                Ok(ip) => Some(ip.to_string()),
+                Err(_) => crate::sites::normalize(trimmed),
+            };
+            if let Some(host) = normalized {
+                if !clean.contains(&host) && clean.len() < MAX_TARGETS {
+                    clean.push(host);
+                }
+            }
+        }
+        self.custom_targets = clean;
+    }
+
     pub fn set_theme(&mut self, theme: &str) {
         self.theme = match theme {
             "light" | "dark" => theme,
@@ -96,6 +129,8 @@ impl Settings {
         .into();
     }
 }
+
+const MAX_TARGETS: usize = 12;
 
 pub struct Store {
     path: PathBuf,
@@ -155,6 +190,15 @@ mod tests {
         assert_eq!(settings.retention_days, 30);
         settings.set_retention(400);
         assert_eq!(settings.retention_days, 90);
+    }
+
+    #[test]
+    fn targets_are_cleaned() {
+        let mut settings = Settings::default();
+        settings.set_game_targets(&["VIE".into(), "vie".into(), "bad code!".into(), "fra".into()]);
+        assert_eq!(settings.game_targets, vec!["vie", "fra"]);
+        settings.set_custom_targets(&["185.40.65.1".into(), "https://Play.Example.com/x".into(), "nope".into(), "0.0.0.0".into()]);
+        assert_eq!(settings.custom_targets, vec!["185.40.65.1", "play.example.com"]);
     }
 
     #[test]

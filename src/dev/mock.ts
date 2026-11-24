@@ -54,6 +54,8 @@ export function mockBackend(): Backend {
     debug: false,
     sites: ["example.com"],
     blocked: [],
+    gameTargets: params.get("games") !== null ? ["vie", "fra"] : [],
+    customTargets: params.get("games") !== null ? ["185.40.65.1"] : [],
   };
   const histories = TARGETS.map(() => [] as (number | null)[]);
   const handlers: ((snapshot: Snapshot) => void)[] = [];
@@ -89,7 +91,13 @@ export function mockBackend(): Backend {
     const best = targets.filter((t) => t.kind === "internet" && !t.failing).sort((a, b) => (a.last ?? 1e9) - (b.last ?? 1e9))[0];
     const condition: Condition = !best ? "down" : best.loss > 5 || (best.last ?? 1e9) > 150 ? "degraded" : "ok";
     const outage: Outage | null = condition === "down" ? { start: started, end: null, cause: "provider" } : null;
-    return { condition, method: "icmp", outage, recent, targets };
+    const extra: TargetView[] = [
+      ...settings.gameTargets.map((code, i) => summarize(`game:${code}`, code === "vie" ? "CS2 Vienna" : "CS2 Frankfurt", code === "vie" ? "146.66.155.66" : "155.133.226.68", "game", histories[1].map((v) => (v === null ? null : v + 44 + i * 8)))),
+      ...settings.customTargets.map((host) => summarize(`custom:${host}`, host, host, "custom", histories[1].map((v) => (v === null ? null : v + 31)))),
+    ];
+    const spikeNow = params.get("spike") !== null ? { start: Date.now() - 140_000, end: null, peak: 837, source: "other" as const } : null;
+    const spikes = [{ start: Date.now() - 3 * HOUR, end: Date.now() - 3 * HOUR + 240_000, peak: 640, source: "other" as const }];
+    return { condition, method: "icmp", outage, recent, spike: spikeNow, spikes, targets: [...targets, ...extra] };
   };
 
   for (let tick = 0; tick < 120; tick += 1) {
@@ -160,6 +168,18 @@ export function mockBackend(): Backend {
       }
       return list;
     },
+    async gameRegions() {
+      return [
+        { code: "ams", name: "Amsterdam (Netherlands)", ip: "155.133.248.36" },
+        { code: "dxb", name: "Dubai (United Arab Emirates)", ip: "185.25.183.163" },
+        { code: "fra", name: "Frankfurt (Germany)", ip: "155.133.226.68" },
+        { code: "lhr", name: "London (England)", ip: "162.254.196.66" },
+        { code: "vie", name: "Vienna (Austria)", ip: "146.66.155.66" },
+        { code: "waw", name: "Warsaw (Poland)", ip: "155.133.230.100" },
+      ];
+    },
+    setGameTargets: (gameTargets) => update({ gameTargets }),
+    setCustomTargets: (customTargets) => update({ customTargets }),
     async history(minutes) {
       return minutesFor(minutes);
     },

@@ -1,7 +1,21 @@
 export type Condition = "starting" | "ok" | "degraded" | "down";
 export type Language = "en" | "tr" | "ru";
 export type Theme = "system" | "light" | "dark";
-export type Kind = "router" | "internet";
+export type Kind = "router" | "internet" | "game" | "custom";
+export type SpikeSource = "other" | "own" | "unknown";
+
+export interface Spike {
+  start: number;
+  end: number | null;
+  peak: number;
+  source: SpikeSource;
+}
+
+export interface GameRegion {
+  code: string;
+  name: string;
+  ip: string;
+}
 export type Cause = "provider" | "local";
 export type Range = 5 | 60 | 1440 | 10080;
 
@@ -99,6 +113,8 @@ export interface Snapshot {
   method: "icmp" | "tcp";
   outage: Outage | null;
   recent: Outage[];
+  spike: Spike | null;
+  spikes: Spike[];
   targets: TargetView[];
 }
 
@@ -111,6 +127,8 @@ export interface Settings {
   debug: boolean;
   sites: string[];
   blocked: BlockedApp[];
+  gameTargets: string[];
+  customTargets: string[];
 }
 
 export interface BlockOutcome {
@@ -153,6 +171,9 @@ export interface Backend {
   setAutostart(enabled: boolean): Promise<Settings>;
   setNotifications(enabled: boolean): Promise<Settings>;
   history(minutes: number): Promise<Minute[]>;
+  gameRegions(): Promise<GameRegion[]>;
+  setGameTargets(codes: string[]): Promise<Settings>;
+  setCustomTargets(hosts: string[]): Promise<Settings>;
   hours(days: number): Promise<Hour[]>;
   siteLists(): Promise<Category[]>;
   checkSites(hosts: string[]): Promise<SiteResult[]>;
