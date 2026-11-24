@@ -1,9 +1,11 @@
 mod gateway;
+pub mod games;
 pub mod history;
 mod ping;
+pub mod spike;
 
 use std::collections::VecDeque;
-use std::net::Ipv4Addr;
+use std::net::{IpAddr, Ipv4Addr};
 use std::sync::Mutex;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -15,6 +17,7 @@ use crate::settings::Store;
 use crate::{i18n, log, notify, tray};
 use history::{Cause, History, Hour, Minute, Outage};
 use ping::Method;
+use spike::{Detector, Event, Spike};
 
 const TICK: Duration = Duration::from_secs(1);
 const KEEP: usize = 300;
@@ -26,6 +29,9 @@ const GATEWAY_EVERY: u64 = 15;
 const SAMPLES_PER_MINUTE: usize = 60;
 const RECENT_OUTAGES: u32 = 5;
 const DAY_MS: i64 = 86_400_000;
+const RECENT_SPIKES: u32 = 5;
+const GAME_PORT: u16 = 27015;
+const CUSTOM_PORT: u16 = 443;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "lowercase")]
@@ -41,11 +47,13 @@ pub enum Condition {
 pub enum Kind {
     Router,
     Internet,
+    Game,
+    Custom,
 }
 
 struct Target {
-    id: &'static str,
-    name: &'static str,
+    id: String,
+    name: String,
     ip: Ipv4Addr,
     port: u16,
     kind: Kind,
@@ -53,8 +61,8 @@ struct Target {
 }
 
 impl Target {
-    fn new(id: &'static str, name: &'static str, ip: Ipv4Addr, port: u16, kind: Kind) -> Self {
-        Self { id, name, ip, port, kind, samples: VecDeque::with_capacity(KEEP) }
+    fn new(id: impl Into<String>, name: impl Into<String>, ip: Ipv4Addr, port: u16, kind: Kind) -> Self {
+        Self { id: id.into(), name: name.into(), ip, port, kind, samples: VecDeque::with_capacity(KEEP) }
     }
 
     fn push(&mut self, sample: Option<u32>) {
@@ -65,7 +73,7 @@ impl Target {
     }
 
     fn view(&self) -> TargetView {
-        summarize(self.id, self.name, self.ip, self.kind, &self.samples)
+        summarize(&self.id, &self.name, self.ip, self.kind, &self.samples)
     }
 }
 
@@ -89,6 +97,8 @@ pub struct Snapshot {
     pub method: Method,
     pub outage: Option<Outage>,
     pub recent: Vec<Outage>,
+    pub spike: Option<Spike>,
+    pub spikes: Vec<Spike>,
     pub targets: Vec<TargetView>,
 }
 
@@ -123,6 +133,10 @@ impl Archive {
         self.run(|h| h.recent_outages(RECENT_OUTAGES)).unwrap_or_default()
     }
 
+    fn spikes(&self) -> Vec<Spike> {
+        self.run(|h| h.recent_spikes(RECENT_SPIKES)).unwrap_or_default()
+    }
+
     fn run<T>(&self, action: impl FnOnce(&History) -> rusqlite::Result<T>) -> Option<T> {
         let history = self.0.as_ref()?;
         action(history).inspect_err(|err| log::error(format!("history: {err}"))).ok()
@@ -145,6 +159,82 @@ fn set_router(targets: &mut Vec<Target>, gateway: Option<Ipv4Addr>) {
     if let Some(ip) = gateway {
         targets.insert(0, Target::new("router", "Router", ip, 80, Kind::Router));
     }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct Extra {
+    id: String,
+    name: String,
+    ip: Ipv4Addr,
+    port: u16,
+    kind: Kind,
+}
+
+#[derive(Default)]
+pub struct Extras(Mutex<(u64, Vec<Extra>)>);
+
+impl Extras {
+    fn set(&self, list: Vec<Extra>) {
+        let mut guard = self.0.lock().unwrap_or_else(|e| e.into_inner());
+        if guard.1 != list {
+            guard.0 += 1;
+            guard.1 = list;
+        }
+    }
+
+    fn get(&self) -> (u64, Vec<Extra>) {
+        self.0.lock().unwrap_or_else(|e| e.into_inner()).clone()
+    }
+}
+
+fn apply_extras(targets: &mut Vec<Target>, extras: &[Extra]) {
+    targets.retain(|t| {
+        matches!(t.kind, Kind::Router | Kind::Internet) || extras.iter().any(|e| e.id == t.id && e.ip == t.ip)
+    });
+    for extra in extras {
+        if !targets.iter().any(|t| t.id == extra.id) {
+            targets.push(Target::new(extra.id.clone(), extra.name.clone(), extra.ip, extra.port, extra.kind));
+        }
+    }
+}
+
+async fn resolve(host: &str) -> Option<Ipv4Addr> {
+    if let Ok(ip) = host.parse() {
+        return Some(ip);
+    }
+    tokio::net::lookup_host((host, 0)).await.ok()?.find_map(|address| match address.ip() {
+        IpAddr::V4(ip) => Some(ip),
+        IpAddr::V6(_) => None,
+    })
+}
+
+pub async fn refresh_extras(app: AppHandle) {
+    let Some(settings) = app.try_state::<Store>().map(|s| s.get()) else {
+        return;
+    };
+    let regions = app.try_state::<games::Catalog>().map(|c| c.list()).unwrap_or_default();
+    let mut list = Vec::new();
+    for code in &settings.game_targets {
+        let Some(region) = regions.iter().find(|r| &r.code == code) else {
+            continue;
+        };
+        if let Ok(ip) = region.ip.parse() {
+            list.push(Extra { id: format!("game:{code}"), name: format!("CS2 {}", games::city(&region.name)), ip, port: GAME_PORT, kind: Kind::Game });
+        }
+    }
+    for host in &settings.custom_targets {
+        match resolve(host).await {
+            Some(ip) => list.push(Extra { id: format!("custom:{host}"), name: host.clone(), ip, port: CUSTOM_PORT, kind: Kind::Custom }),
+            None => log::warn(format!("could not resolve target {host}")),
+        }
+    }
+    if let Some(extras) = app.try_state::<Extras>() {
+        extras.set(list);
+    }
+}
+
+fn own_rate(app: &AppHandle) -> Option<u64> {
+    app.try_state::<crate::traffic::Traffic>().and_then(|t| t.rate())
 }
 
 fn summarize(id: &str, name: &str, ip: Ipv4Addr, kind: Kind, samples: &VecDeque<Option<u32>>) -> TargetView {
@@ -234,17 +324,23 @@ struct Tracker {
     condition: Condition,
     ongoing: Option<Outage>,
     recent: Vec<Outage>,
+    detector: Detector,
+    spikes: Vec<Spike>,
 }
 
 pub fn start(app: AppHandle) {
     let archive = open_archive(&app);
     let recent = archive.recent();
+    let spikes = archive.spikes();
     app.manage(archive);
     app.manage(Latest::default());
+    app.manage(Extras::default());
+    tauri::async_runtime::spawn(refresh_extras(app.clone()));
     tauri::async_runtime::spawn(async move {
         let mut targets = internet_targets();
         let mut gateway = None;
-        let mut tracker = Tracker { condition: Condition::Starting, ongoing: None, recent };
+        let mut extras_version = 0;
+        let mut tracker = Tracker { condition: Condition::Starting, ongoing: None, recent, detector: Detector::default(), spikes };
         let mut minute: Vec<Option<u32>> = Vec::with_capacity(SAMPLES_PER_MINUTE);
         let mut tick: u64 = 0;
         let mut ticker = tokio::time::interval(TICK);
@@ -263,6 +359,13 @@ pub fn start(app: AppHandle) {
                 }
             }
             tick += 1;
+            if let Some(extras) = app.try_state::<Extras>() {
+                let (version, list) = extras.get();
+                if version != extras_version {
+                    apply_extras(&mut targets, &list);
+                    extras_version = version;
+                }
+            }
 
             let handles: Vec<_> = targets
                 .iter()
@@ -281,6 +384,22 @@ pub fn start(app: AppHandle) {
             if next != tracker.condition {
                 transition(&app, &mut tracker, next, &views);
             }
+            if tracker.condition != Condition::Down {
+                let router = views.iter().find(|t| t.kind == Kind::Router).and_then(|t| t.last);
+                let best = best_internet(&views).and_then(|t| t.last);
+                let event = tracker.detector.observe(now_ms(), best, router, || spike::source(own_rate(&app), crate::speed::capacity()));
+                match event {
+                    Some(Event::Started(found)) => announce_spike(&app, &found),
+                    Some(Event::Ended(done)) => {
+                        log::write(format!("ping spike ended, peak {} ms", done.peak));
+                        if let Some(archive) = app.try_state::<Archive>() {
+                            archive.run(|h| h.add_spike(&done));
+                            tracker.spikes = archive.spikes();
+                        }
+                    }
+                    None => {}
+                }
+            }
             if minute.len() >= SAMPLES_PER_MINUTE {
                 let summary = summarize_minute(now_ms(), &minute);
                 if let Some(archive) = app.try_state::<Archive>() {
@@ -294,6 +413,8 @@ pub fn start(app: AppHandle) {
                 method: ping::method(),
                 outage: tracker.ongoing.clone(),
                 recent: tracker.recent.clone(),
+                spike: tracker.detector.ongoing.clone(),
+                spikes: tracker.spikes.clone(),
                 targets: views,
             };
             if let Some(latest) = app.try_state::<Latest>() {
@@ -302,6 +423,16 @@ pub fn start(app: AppHandle) {
             let _ = app.emit("health", &snapshot);
         }
     });
+}
+
+fn announce_spike(app: &AppHandle, found: &Spike) {
+    log::warn(format!("ping spike, source {}", found.source.as_str()));
+    let Some(settings) = app.try_state::<Store>().map(|s| s.get()) else {
+        return;
+    };
+    if settings.notifications && found.source == spike::Source::Other {
+        notify::show(app, i18n::labels(&settings.language).busy_other);
+    }
 }
 
 fn transition(app: &AppHandle, tracker: &mut Tracker, next: Condition, views: &[TargetView]) {
@@ -392,6 +523,19 @@ mod tests {
         assert_eq!(minute.ping, Some(15));
         assert_eq!(minute.loss, 50.0);
         assert_eq!(summarize_minute(0, &[None]).ping, None);
+    }
+
+    #[test]
+    fn extra_targets_are_added_and_removed() {
+        let mut targets = internet_targets();
+        let game = Extra { id: "game:vie".into(), name: "CS2 Vienna".into(), ip: Ipv4Addr::new(146, 66, 155, 66), port: GAME_PORT, kind: Kind::Game };
+        apply_extras(&mut targets, std::slice::from_ref(&game));
+        assert_eq!(targets.len(), 3);
+        targets[2].push(Some(64));
+        apply_extras(&mut targets, std::slice::from_ref(&game));
+        assert_eq!(targets[2].samples.len(), 1);
+        apply_extras(&mut targets, &[]);
+        assert_eq!(targets.len(), 2);
     }
 
     #[test]

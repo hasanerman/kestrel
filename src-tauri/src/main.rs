@@ -34,6 +34,7 @@ fn main() {
             tray::create(app.handle(), &store.get())?;
             app.manage(store);
             health::start(app.handle().clone());
+            health::games::start(app.handle().clone());
             traffic::start(app.handle().clone());
             updater::watch(app.handle().clone());
             if !start_in_tray {
@@ -53,6 +54,9 @@ fn main() {
             commands::history,
             commands::hours,
             commands::traffic,
+            commands::game_regions,
+            commands::set_game_targets,
+            commands::set_custom_targets,
             commands::set_language,
             commands::set_theme,
             commands::set_autostart,

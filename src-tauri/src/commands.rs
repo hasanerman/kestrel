@@ -51,6 +51,25 @@ pub fn hours(archive: State<Archive>, days: u32) -> Vec<Hour> {
 }
 
 #[tauri::command]
+pub fn game_regions(catalog: State<crate::health::games::Catalog>) -> Vec<crate::health::games::Region> {
+    catalog.list()
+}
+
+#[tauri::command]
+pub async fn set_game_targets(app: AppHandle, store: State<'_, Store>, codes: Vec<String>) -> Result<Settings, String> {
+    let settings = store.update(|s| s.set_game_targets(&codes));
+    crate::health::refresh_extras(app).await;
+    Ok(settings)
+}
+
+#[tauri::command]
+pub async fn set_custom_targets(app: AppHandle, store: State<'_, Store>, hosts: Vec<String>) -> Result<Settings, String> {
+    let settings = store.update(|s| s.set_custom_targets(&hosts));
+    crate::health::refresh_extras(app).await;
+    Ok(settings)
+}
+
+#[tauri::command]
 pub fn traffic(monitor: State<Traffic>) -> Option<traffic::Snapshot> {
     monitor.latest()
 }
