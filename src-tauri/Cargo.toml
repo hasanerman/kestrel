@@ -1,6 +1,6 @@
 [package]
 name = "kestrel"
-version = "0.2.0"
+version = "0.3.0"
 description = "Watches your internet connection, the apps that use it and the sites you can reach"
 authors = ["kestrel contributors"]
 license = "GPL-3.0-only"

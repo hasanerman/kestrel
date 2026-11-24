@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.0
+
+- Game servers: add Steam game servers (CS2, Dota 2) as ping targets. The list of regions comes live from Valve, so it stays correct when servers change.
+- Add any IP address or host name as your own ping target.
+- Ping spike detection: when your ping jumps while your router still answers fast, kestrel records the spike and tells you whether this computer or another device on your network is using the line. You get a notification when another device is the cause.
+- The settings page no longer hides values behind its scrollbar.
+
 ## 0.2.0
 
 - Hourly view: a 7-day heat map of every hour with average ping, loss and drops, the worst hours of the day and 7-day uptime.
