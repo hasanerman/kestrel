@@ -1,4 +1,10 @@
 use std::sync::atomic::{AtomicU64, Ordering};
+
+static LAST_DOWNLOAD: AtomicU64 = AtomicU64::new(0);
+
+pub fn capacity() -> Option<u64> {
+    Some(LAST_DOWNLOAD.load(Ordering::Relaxed)).filter(|bytes| *bytes > 0)
+}
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -113,6 +119,7 @@ pub async fn run(app: AppHandle) -> std::result::Result<Result, String> {
     })
     .await
     .inspect_err(|e| crate::log::error(format!("speed test download: {e}")))?;
+    LAST_DOWNLOAD.store((download * 125_000.0) as u64, Ordering::Relaxed);
     let _ = app.emit("speed", Progress { phase: Phase::Upload, mbps: 0.0 });
     let upload = upload(&client).await.inspect_err(|e| crate::log::warn(format!("speed test upload: {e}"))).unwrap_or(0.0);
     crate::log::write(format!("speed test: {download} Mbps down, {upload} Mbps up"));

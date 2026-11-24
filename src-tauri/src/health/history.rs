@@ -4,6 +4,8 @@ use std::sync::Mutex;
 use rusqlite::{params, Connection};
 use serde::Serialize;
 
+use super::spike::{Source, Spike};
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Cause {
@@ -95,7 +97,8 @@ impl History {
         connection.execute_batch(
             "PRAGMA journal_mode = WAL;
              CREATE TABLE IF NOT EXISTS outages (start INTEGER PRIMARY KEY, end INTEGER, cause TEXT NOT NULL);
-             CREATE TABLE IF NOT EXISTS minutes (at INTEGER PRIMARY KEY, ping INTEGER, loss REAL NOT NULL);",
+             CREATE TABLE IF NOT EXISTS minutes (at INTEGER PRIMARY KEY, ping INTEGER, loss REAL NOT NULL);
+             CREATE TABLE IF NOT EXISTS spikes (start INTEGER PRIMARY KEY, end INTEGER, peak INTEGER NOT NULL, source TEXT NOT NULL);",
         )?;
         Ok(Self(Mutex::new(connection)))
     }
@@ -171,9 +174,30 @@ impl History {
         Ok(merge_hours(&minutes, &outages, since))
     }
 
+    pub fn add_spike(&self, spike: &Spike) -> rusqlite::Result<()> {
+        self.with(|db| {
+            db.execute(
+                "INSERT OR REPLACE INTO spikes (start, end, peak, source) VALUES (?1, ?2, ?3, ?4)",
+                params![spike.start, spike.end, spike.peak, spike.source.as_str()],
+            )
+            .map(|_| ())
+        })
+    }
+
+    pub fn recent_spikes(&self, limit: u32) -> rusqlite::Result<Vec<Spike>> {
+        self.with(|db| {
+            let mut query = db.prepare("SELECT start, end, peak, source FROM spikes ORDER BY start DESC LIMIT ?1")?;
+            let rows = query.query_map([limit], |row| {
+                Ok(Spike { start: row.get(0)?, end: row.get(1)?, peak: row.get(2)?, source: Source::parse(&row.get::<_, String>(3)?) })
+            })?;
+            rows.collect()
+        })
+    }
+
     pub fn prune(&self, before: i64) -> rusqlite::Result<()> {
         self.with(|db| {
             db.execute("DELETE FROM minutes WHERE at < ?1", [before])?;
+            db.execute("DELETE FROM spikes WHERE start < ?1", [before])?;
             db.execute("DELETE FROM outages WHERE start < ?1", [before]).map(|_| ())
         })
     }
@@ -197,6 +221,14 @@ mod tests {
         assert_eq!(hours.len(), 2);
         assert_eq!(hours[0], Hour { at: HOUR_MS, ping: Some(15), loss: 50.0, down: 60, samples: 3 });
         assert_eq!(hours[1], Hour { at: 2 * HOUR_MS, ping: None, loss: 0.0, down: 120, samples: 0 });
+    }
+
+    #[test]
+    fn records_spikes() {
+        let history = History::in_memory().unwrap();
+        let spike = Spike { start: 1_000, end: Some(61_000), peak: 840, source: Source::Other };
+        history.add_spike(&spike).unwrap();
+        assert_eq!(history.recent_spikes(5).unwrap(), vec![spike]);
     }
 
     #[test]

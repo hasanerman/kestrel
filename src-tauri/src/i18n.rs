@@ -11,6 +11,7 @@ pub struct Labels {
     pub lost: &'static str,
     pub lost_local: &'static str,
     pub restored: &'static str,
+    pub busy_other: &'static str,
 }
 
 const EN: Labels = Labels {
@@ -24,6 +25,7 @@ const EN: Labels = Labels {
     lost: "Internet connection dropped. Your router answers, so the problem is likely your provider.",
     lost_local: "Your Wi-Fi or router is not responding.",
     restored: "Internet is back.",
+    busy_other: "Ping is high, but not because of this computer. Another device on your network is probably using the line.",
 };
 
 const TR: Labels = Labels {
@@ -37,6 +39,7 @@ const TR: Labels = Labels {
     lost: "İnternet koptu. Modem cevap veriyor, sorun büyük ihtimalle servis sağlayıcında.",
     lost_local: "Wi-Fi ya da modem cevap vermiyor.",
     restored: "İnternet geri geldi.",
+    busy_other: "Ping yüksek ama sebebi bu bilgisayar değil. Ağdaki başka bir cihaz büyük ihtimalle hattı dolduruyor.",
 };
 
 const RU: Labels = Labels {
@@ -50,6 +53,7 @@ const RU: Labels = Labels {
     lost: "Интернет пропал. Роутер отвечает, скорее всего проблема у провайдера.",
     lost_local: "Wi-Fi или роутер не отвечает.",
     restored: "Интернет снова работает.",
+    busy_other: "Пинг высокий, но не из-за этого компьютера. Скорее всего, канал занимает другое устройство в сети.",
 };
 
 pub fn labels(language: &str) -> &'static Labels {

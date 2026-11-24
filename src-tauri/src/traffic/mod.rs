@@ -400,6 +400,12 @@ impl Traffic {
     pub fn latest(&self) -> Option<Snapshot> {
         lock(&self.0).latest.clone()
     }
+
+    pub fn rate(&self) -> Option<u64> {
+        let monitor = lock(&self.0);
+        let latest = monitor.latest.as_ref()?;
+        (latest.status == Status::Running).then_some(latest.down + latest.up)
+    }
 }
 
 pub fn start(app: AppHandle) {
